@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 from cpg_utils import Path, config, hail_batch, to_path
 
-
 if TYPE_CHECKING:
     from hailtop.batch.job import BashJob
 

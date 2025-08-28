@@ -3,15 +3,15 @@ Hail Batch jobs needed to call mitochondrial SNVs
 """
 
 import hailtop.batch as hb
+from cpg_flow import filetypes, resources, targets
+from cpg_utils import Path, config, hail_batch, to_path
 from hailtop.batch.job import Job
 from hailtop.batch.resource import PythonResult
 
-from cpg_utils import Path, to_path, config, hail_batch
-from cpg_flow import filetypes, resources, targets
-from cpg_flow_mito.utils import get_mito_references, get_control_region_intervals
+from cpg_flow_mito.utils import get_control_region_intervals, get_mito_references
 
 
-def subset_cram_to_chrM(
+def subset_cram_to_chrm(
     cram_path: filetypes.CramPath,
     job_attrs: dict,
 ) -> Job:
@@ -67,7 +67,7 @@ def subset_cram_to_chrM(
 
 def mito_realign(
     sequencing_group_id: str,
-    input_bam: hb.ResourceGroup,
+    input_bam: hb.ResourceGroup | hb.Resource,
     job_attrs: dict[str, str],
     shifted: bool = False,
 ) -> Job:
@@ -115,7 +115,7 @@ def mito_realign(
 
 
 def collect_coverage_metrics(
-    cram: hb.ResourceGroup,
+    cram: hb.ResourceGroup | hb.Resource,
     metrics: Path,
     theoretical_sensitivity: Path,
     job_attrs: dict,
@@ -166,10 +166,10 @@ def collect_coverage_metrics(
 
 
 def extract_coverage_mean(
-    metrics: hb.ResourceFile,
-    mean_path: Path | None = None,
-    median_path: Path | None = None,
-    job_attrs: dict | None = None,
+    metrics: hb.ResourceFile | hb.Resource,
+    mean_path: Path,
+    median_path: Path,
+    job_attrs: dict,
 ) -> Job:
     """
     Extract mean and median coverage values for sequencing group
@@ -184,8 +184,7 @@ def extract_coverage_mean(
         job.median_coverage: median coverage of chrM
     """
     batch_instance = hail_batch.get_batch()
-    job_attrs = job_attrs or {} | dict(tool='R')
-    j = batch_instance.new_bash_job('extract_coverage_mean', job_attrs)
+    j = batch_instance.new_bash_job('extract_coverage_mean', job_attrs | {'tool': 'R'})
     j.image(config.config_retrieve(['images', 'peer']))
 
     resources.STANDARD.set_resources(j, ncpu=2)
@@ -206,16 +205,14 @@ def extract_coverage_mean(
         CODE
     """)
 
-    if mean_path:
-        batch_instance.write_output(j.mean_coverage, str(mean_path))
-    if median_path:
-        batch_instance.write_output(j.median_coverage, str(median_path))
+    batch_instance.write_output(j.mean_coverage, str(mean_path))
+    batch_instance.write_output(j.median_coverage, str(median_path))
 
     return j
 
 
 def coverage_at_every_base(
-    cram: hb.ResourceGroup,
+    cram: hb.ResourceGroup | hb.Resource,
     job_attrs: dict,
     shifted: bool = False,
 ) -> Job:
@@ -224,6 +221,8 @@ def coverage_at_every_base(
 
     Args:
         cram: Input cram
+        job_attrs: Dictionary of job attributes to add to the job.
+        shifted: bool, determines which reference group is collected
 
     Outputs:
         job.per_base_coverage
@@ -258,10 +257,10 @@ def coverage_at_every_base(
 
 
 def merge_coverage(
-    non_cr_coverage: hb.ResourceFile,
-    shifted_cr_coverage: hb.ResourceFile,
+    non_cr_coverage: hb.ResourceFile | hb.Resource,
+    shifted_cr_coverage: hb.ResourceFile | hb.Resource,
     merged_coverage: Path,
-    job_attrs: dict | None = None,
+    job_attrs: dict,
 ) -> Job:
     """
     Merge per base coverage files from non-control region and shifted control region.
@@ -368,9 +367,9 @@ def mito_mutect2(
 
 
 def liftover_and_combine_vcfs(
-    vcf: hb.ResourceGroup,
-    shifted_vcf: hb.ResourceGroup,
-    job_attrs: dict | None = None,
+    vcf: hb.ResourceGroup | hb.Resource,
+    shifted_vcf: hb.ResourceGroup | hb.Resource,
+    job_attrs: dict,
 ) -> Job:
     """
     Lifts over shifted vcf and combines it with the rest of the chrM calls.
@@ -418,7 +417,7 @@ def liftover_and_combine_vcfs(
 def merge_mutect_stats(
     first_stats_file: hb.ResourceFile,
     second_stats_file: hb.ResourceFile,
-    job_attrs: dict | None = None,
+    job_attrs: dict,
 ) -> Job:
     """
     Merge stats files from two mutect runs
@@ -451,11 +450,11 @@ def merge_mutect_stats(
 
 
 def filter_variants(
-    vcf: hb.ResourceGroup,
-    merged_mutect_stats: hb.ResourceFile,
+    vcf: hb.ResourceGroup | hb.Resource,
+    merged_mutect_stats: hb.ResourceFile | hb.Resource,
+    job_attrs: dict,
     contamination_estimate: hb.ResourceFile | None = None,
     min_allele_fraction: int | None = None,
-    job_attrs: dict | None = None,
 ) -> Job:
     """
     Filter mutect variant calls
@@ -485,6 +484,8 @@ def filter_variants(
     Note:
         contamination_estimate pre-calculation has been moved out of this function.
     """
+    # alt_allele config from
+    # https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
     max_alt_allele_count = config.config_retrieve(['references', 'max_alt_allele_count'])
     if min_allele_fraction is None:
         min_allele_fraction = config.config_retrieve(['references', 'vaf_filter_threshold'])
@@ -534,7 +535,7 @@ def filter_variants(
 
 
 def split_multi_allelics(
-    vcf: hb.ResourceGroup,
+    vcf: hb.ResourceGroup | hb.Resource,
     job_attrs: dict,
     remove_non_pass_sites: bool = False,
 ) -> Job:
@@ -590,9 +591,9 @@ def split_multi_allelics(
 
 
 def get_contamination(
-    vcf: hb.ResourceGroup,
-    haplocheck_output: Path | None,
-    job_attrs: dict | None = None,
+    vcf: hb.ResourceGroup | hb.Resource,
+    haplocheck_output: Path,
+    job_attrs: dict,
 ) -> Job:
     """
     Uses new HaplocheckerCLI to estimate levels of contamination in mitochondria based
@@ -609,8 +610,7 @@ def get_contamination(
       https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L239
     """
     batch_instance = hail_batch.get_batch()
-    job_attrs = job_attrs or {} | dict(tool='haplocheckcli')
-    j = batch_instance.new_bash_job('get_contamination', job_attrs)
+    j = batch_instance.new_bash_job('get_contamination', job_attrs | {'tool': 'haplocheckcli'})
     j.image(config.config_retrieve(['images', 'haplocheckcli']))
 
     resources.STANDARD.set_resources(j, ncpu=2)
@@ -624,16 +624,15 @@ def get_contamination(
         """
     )
 
-    if haplocheck_output:
-        batch_instance.write_output(j.haplocheck_output, str(haplocheck_output))
+    batch_instance.write_output(j.haplocheck_output, str(haplocheck_output))
 
     return j
 
 
 def parse_contamination_results(
-    haplocheck_output: hb.ResourceFile,
-    verifybamid_output: hb.ResourceFile | None = None,
-    job_attrs: dict | None = None,
+    haplocheck_output: hb.ResourceFile | hb.Resource,
+    verifybamid_output: hb.ResourceFile | hb.Resource,
+    job_attrs: dict,
 ) -> tuple[Job, PythonResult]:
     """
     Post process halpocheck and (optionally) verifybamid reports to determine single value
@@ -656,7 +655,10 @@ def parse_contamination_results(
 
     resources.STANDARD.set_resources(j, ncpu=4)
 
-    def parse_contamination_worker(haplocheck_report: str, verifybamid_report: str | None) -> float:
+    def parse_contamination_worker(
+        haplocheck_report: str,
+        verifybamid_report: str,
+    ) -> float:
         """
         Process haplocheckCLI and verifyBamID outputs to get contamination level as a
         single float.
@@ -667,35 +669,27 @@ def parse_contamination_results(
             for line in haplocheck:
                 cleaned_lines.append([x.strip('"') for x in line.strip().split('\t')])
         # sanity check and reformat
-        assert len(cleaned_lines) == 2, 'haplocheck report is unexpected format'
-        assert len(cleaned_lines[0]) == 17, 'haplocheck report is unexpected format'
-        report = dict(zip(cleaned_lines[0], cleaned_lines[1]))
+        if len(cleaned_lines) != 0 or len(cleaned_lines[0]) != 17:
+            raise ValueError(f'Haplocheck report is unexpected format: {cleaned_lines}')
+
+        report = dict(zip(cleaned_lines[0], cleaned_lines[1], strict=False))
 
         # Determine final contamination level
+        max_contamination: float = 0.0
         if report['Contamination'] == 'YES':
             if float(report['MeanHetLevelMajor']) == 0:
                 max_contamination = float(report['MeanHetLevelMinor'])
             else:
                 max_contamination = 1.0 - float(report['MeanHetLevelMajor'])
-        else:
-            max_contamination = 0.0
 
         # If verifybamid_report is provided, chose the higher of the two
-        if verifybamid_report:
-            with open(verifybamid_report) as verifybamid:
-                lines = [line.split('\t') for line in verifybamid.readlines()]
-                assert len(lines) == 2
-                report = dict(zip(lines[0], lines[1]))
+        with open(verifybamid_report) as verifybamid:
+            lines = [line.split('\t') for line in verifybamid.readlines()]
+            report = dict(zip(lines[0], lines[1], strict=False))
 
-            verifybamid_estimate = float(report['FREEMIX'])
+        return max(max_contamination, float(report['FREEMIX']))
 
-            if verifybamid_estimate > max_contamination:
-                max_contamination = verifybamid_estimate
-
-        return max_contamination
-
-    # Call parse_contamination_worker as pythonJob which returns contamination_level
-    # as a hail PythonResult.
+    # Call parse_contamination_worker as pythonJob which returns contamination_level as a hail PythonResult.
     contamination_level = j.call(parse_contamination_worker, haplocheck_output, verifybamid_output)
 
     return j, contamination_level

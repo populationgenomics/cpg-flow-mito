@@ -50,4 +50,3 @@ mitoreport = "australia-southeast1-docker.pkg.dev/cpg-common/images/mitoreport:1
 peer = "australia-southeast1-docker.pkg.dev/cpg-common/images/peer:1.3"
 picard = "australia-southeast1-docker.pkg.dev/cpg-common/images/picard:2.27.4"
 vep = "australia-southeast1-docker.pkg.dev/cpg-common/images/vep_110:release_110.1"
-

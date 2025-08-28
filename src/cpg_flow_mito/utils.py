@@ -2,12 +2,11 @@
 suggested location for any utility methods or constants used across multiple stages
 """
 
-from typing import TYPE_CHECKING
-from functools import cache
-
-from cpg_utils import hail_batch, config
-
 from datetime import datetime
+from functools import cache
+from typing import TYPE_CHECKING
+
+from cpg_utils import config, hail_batch
 
 if TYPE_CHECKING:
     from hailtop.batch import ResourceGroup
@@ -16,7 +15,7 @@ DATE_STRING: str = datetime.now().strftime('%y-%m')  # noqa: DTZ005
 
 
 @cache
-def get_mito_references(shifted: bool = False) -> ResourceGroup:
+def get_mito_references(shifted: bool = False) -> 'ResourceGroup':
     """
     get various mito config entries, reads them into the current batch
     single method switches between shifted and non-shifted references
@@ -41,7 +40,7 @@ def get_mito_references(shifted: bool = False) -> ResourceGroup:
 
 
 @cache
-def get_control_region_intervals() -> ResourceGroup:
+def get_control_region_intervals() -> 'ResourceGroup':
     """Get mito control region intervals."""
 
     return hail_batch.get_batch().read_input_group(

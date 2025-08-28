@@ -3,6 +3,7 @@
 from argparse import ArgumentParser
 
 from cpg_flow.workflow import run_workflow
+
 from cpg_flow_mito.stages import MitoReport
 
 
