@@ -42,11 +42,7 @@ def get_mito_references(shifted: bool = False) -> ResourceGroup:
 
 @cache
 def get_control_region_intervals() -> ResourceGroup:
-    """
-    get mito control region intervals
-    Returns:
-        dict: mito control region intervals
-    """
+    """Get mito control region intervals."""
 
     return hail_batch.get_batch().read_input_group(
         control_region_shifted=config.config_retrieve(['references', 'shifted_control_region_interval']),

@@ -7,18 +7,13 @@ from hailtop.batch.job import Job
 from hailtop.batch.resource import PythonResult
 
 from cpg_utils import Path, to_path, config, hail_batch
-from cpg_utils.config import get_config, image_path, reference_path
-from cpg_utils.hail_batch import (
-    command,
-    fasta_res_group,
-)
 from cpg_flow import filetypes, resources, targets
 from cpg_flow_mito.utils import get_mito_references, get_control_region_intervals
 
 
 def subset_cram_to_chrM(
     cram_path: filetypes.CramPath,
-    job_attrs: dict | None = None,
+    job_attrs: dict,
 ) -> Job:
     """
     Extract read pairs with at least one read mapping to chrM
@@ -35,17 +30,15 @@ def subset_cram_to_chrM(
 
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/330c59a5bcda6a837a545afd2d453361f373fae3/scripts/mitochondria_m2_wdl/MitochondriaPipeline.wdl#LL188-L244C2
-
     """
     batch_instance = hail_batch.get_batch()
 
-    job_attrs = (job_attrs or {}) | dict(tool='gatk_PrintReads')
-    j = batch_instance.new_job('subset_cram_to_chrM', job_attrs)
-    j.image(image_path('gatk'))
+    j = batch_instance.new_job('subset_cram_to_chrM', job_attrs | {'tool': 'gatk_PrintReads'})
+    j.image(config.config_retrieve(['images', 'gatk']))
 
     resources.STANDARD.set_resources(j, ncpu=2)
 
-    reference = fasta_res_group(batch_instance)
+    reference = hail_batch.fasta_res_group(batch_instance)
     j.declare_resource_group(
         output_bam={
             'bam': '{root}.bam',
@@ -54,12 +47,11 @@ def subset_cram_to_chrM(
     )
 
     # We are only accessing a tiny fraction of the genome. Mounting is the best option.
-    bucket = cram_path.path.drive
     bucket_mount_path = to_path('/bucket')
-    j.cloudfuse(bucket, str(bucket_mount_path), read_only=True)
+    j.cloudfuse(cram_path.path.drive, str(bucket_mount_path), read_only=True)
     mounted_cram_path = bucket_mount_path / '/'.join(cram_path.path.parts[2:])
 
-    cmd = f"""
+    j.command(f"""
         gatk PrintReads \
             -R {reference.base} \
             -L chrM \
@@ -68,9 +60,8 @@ def subset_cram_to_chrM(
             -I {mounted_cram_path} \
             -O {j.output_bam.bam}
 
-    """
+    """)
 
-    j.command(command(cmd))
     return j
 
 
@@ -104,12 +95,12 @@ def mito_realign(
 
     mito_ref = get_mito_references(shifted=shifted)
 
-    # todo into config
-    j.image(image_path('bwa'))
+    j.image(config.config_retrieve(['images', 'bwa']))
 
     nthreads = resources.STANDARD.set_resources(j, ncpu=4).get_nthreads()
 
-    cmd = f"""\
+    j.command(
+        f"""\
         bazam -Xmx16g \
             -n{min(nthreads, 6)} -bam {input_bam.bam} | \
         bwa \
@@ -119,7 +110,7 @@ def mito_realign(
         samtools view -bSu -T {mito_ref.base} - | \
         samtools sort -o {j.output_cram}
         """
-    j.command(command(cmd))
+    )
 
     return j
 
@@ -151,12 +142,11 @@ def collect_coverage_metrics(
     batch_instance = hail_batch.get_batch()
     j = batch_instance.new_job('collect_coverage_metrics', job_attrs | {'tool': 'picard_CollectWgsMetrics'})
 
-    # todo into config
-    j.image(image_path('picard'))
+    j.image(config.config_retrieve(['images', 'picard']))
 
     resources.STANDARD.set_resources(j, ncpu=2)
 
-    cmd = f"""
+    j.command(f"""
         picard \
             CollectWgsMetrics \
             INPUT={cram.cram} \
@@ -169,9 +159,8 @@ def collect_coverage_metrics(
             INCLUDE_BQ_HISTOGRAM=true \
             THEORETICAL_SENSITIVITY_OUTPUT={j.theoretical_sensitivity}
 
-    """
+    """)
 
-    j.command(command(cmd))
     if metrics:
         batch_instance.write_output(j.metrics, str(metrics))
     if theoretical_sensitivity:
@@ -201,12 +190,11 @@ def extract_coverage_mean(
     batch_instance = hail_batch.get_batch()
     job_attrs = job_attrs or {} | dict(tool='R')
     j = batch_instance.new_job('extract_coverage_mean', job_attrs)
-    j.image(image_path('peer'))
+    j.image(config.config_retrieve(['images', 'peer']))
 
     resources.STANDARD.set_resources(j, ncpu=2)
 
-    cmd = f"""
-
+    j.command(f"""
     R --vanilla <<CODE
         df = read.table(
             "{metrics}",skip=6,header=TRUE,stringsAsFactors=FALSE,sep='\\\\t',nrows=1
@@ -220,9 +208,8 @@ def extract_coverage_mean(
             "{j.median_coverage}",
             quote=F, col.names=F, row.names=F)
         CODE
-    """
+    """)
 
-    j.command(command(cmd))
     if mean_path:
         batch_instance.write_output(j.mean_coverage, str(mean_path))
     if median_path:
@@ -246,19 +233,21 @@ def coverage_at_every_base(
         job.per_base_coverage
         job.hs_metrics_out
     """
+    batch_instance = hail_batch.get_batch()
+
     intervals_list = (
         get_control_region_intervals().control_region_shifted
         if shifted
         else get_control_region_intervals().non_control_region
     )
     reference = get_mito_references(shifted)
-    batch_instance = hail_batch.get_batch()
+
     j = batch_instance.new_job('coverage_at_every_base', job_attrs | {'tool': 'picard_CollectHsMetrics'})
-    j.image(image_path('picard'))
+    j.image(config.config_retrieve(['images', 'picard']))
 
     resources.STANDARD.set_resources(j, ncpu=2)
 
-    cmd = f"""
+    j.command(f"""
     picard CollectHsMetrics \
       I={cram.cram} \
       R={reference.base} \
@@ -268,11 +257,7 @@ def coverage_at_every_base(
       BI={intervals_list} \
       COVMAX=20000 \
       SAMPLE_SIZE=1
-
-    """
-
-    j.command(command(cmd))
-
+    """)
     return j
 
 
@@ -296,13 +281,12 @@ def merge_coverage(
         job.merged_coverage: Merged coverage tsv.
     """
     batch_instance = hail_batch.get_batch()
-    job_attrs = job_attrs or {} | dict(tool='R')
-    j = batch_instance.new_job('merge_coverage', job_attrs)
-    j.image(image_path('peer'))
+    j = batch_instance.new_job('merge_coverage', job_attrs | {'tool': 'R'})
+    j.image(config.config_retrieve(['images', 'peer']))
 
     resources.STANDARD.set_resources(j, ncpu=2)
 
-    cmd = f"""
+    j.command(f"""
     R --vanilla <<CODE
       shift_back = function(x) {{
         if (x < 8570) {{
@@ -324,10 +308,9 @@ def merge_coverage(
       write.table(combined_table, "{j.merged_coverage}", row.names=F, col.names=T, quote=F, sep="\\\t")
 
     CODE
-    """
+    """)
 
-    j.command(command(cmd))
-    batch_instance.write_output(j.merged_coverage, str(merged_coverage))
+    batch_instance.write_output(j.merged_coverage, merged_coverage)
 
     return j
 
@@ -335,8 +318,8 @@ def merge_coverage(
 def mito_mutect2(
     cram: hb.ResourceGroup,
     region: str,
+    job_attrs: dict,
     max_reads_per_alignment_start: int = 75,
-    job_attrs: dict | None = None,
     shifted: bool = False,
 ) -> Job:
     """
@@ -357,9 +340,9 @@ def mito_mutect2(
     """
     reference = get_mito_references(shifted)
     batch_instance = hail_batch.get_batch()
-    job_attrs = job_attrs or {} | dict(tool='Mutect2')
-    j = batch_instance.new_job('mito_mutect2', job_attrs)
-    j.image(image_path('gatk'))
+
+    j = batch_instance.new_job('mito_mutect2', job_attrs | {'tool': 'Mutect2'})
+    j.image(config.config_retrieve(['images', 'gatk']))
 
     res = resources.STANDARD.set_resources(j, ncpu=4)
 
@@ -371,7 +354,7 @@ def mito_mutect2(
         },
     )
 
-    cmd = f"""
+    j.command(f"""
         gatk --java-options "{res.java_mem_options()}" Mutect2 \
             -R {reference.base} \
             -I {cram.cram} \
@@ -383,9 +366,7 @@ def mito_mutect2(
             --max-reads-per-alignment-start {max_reads_per_alignment_start} \
             --max-mnp-distance 0 \
             -L {region}
-    """
-
-    j.command(command(cmd))
+    """)
 
     return j
 
@@ -413,16 +394,15 @@ def liftover_and_combine_vcfs(
     shift_back_chain = hail_batch.get_batch().read_input(config.config_retrieve(['references', 'shift_back_chain']))
     reference = get_mito_references()
     batch_instance = hail_batch.get_batch()
-    job_attrs = job_attrs or {} | dict(tool='picard_LiftoverVcf')
-    j = batch_instance.new_job('liftover_and_combine_vcfs', job_attrs)
-    j.image(image_path('picard'))
+    j = batch_instance.new_job('liftover_and_combine_vcfs', job_attrs | {'tool': 'liftover_and_combine_vcfs'})
+    j.image(config.config_retrieve(['images', 'picard']))
 
     resources.STANDARD.set_resources(j, ncpu=4)
 
     j.declare_resource_group(lifted_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
     j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
 
-    cmd = f"""
+    j.command(f"""
         picard LiftoverVcf \
             I={shifted_vcf['vcf.gz']} \
             O={j.lifted_vcf['vcf.gz']} \
@@ -434,9 +414,7 @@ def liftover_and_combine_vcfs(
             I={vcf['vcf.gz']} \
             I={j.lifted_vcf['vcf.gz']} \
             O={j.output_vcf['vcf.gz']}
-    """
-
-    j.command(command(cmd))
+    """)
 
     return j
 
@@ -460,19 +438,18 @@ def merge_mutect_stats(
     https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL573-L598C2
     """
     batch_instance = hail_batch.get_batch()
-    job_attrs = job_attrs or {} | dict(tool='gatk_MergeMutectStats')
-    j = batch_instance.new_job('merge_stats', job_attrs)
-    j.image(image_path('gatk'))
+    j = batch_instance.new_job('merge_stats', job_attrs | {'tool': 'gatk_MergeMutectStats'})
+    j.image(config.config_retrieve(['images', 'gatk']))
 
     resources.STANDARD.set_resources(j, ncpu=4)
 
-    cmd = f"""
+    j.command(
+        f"""
         gatk MergeMutectStats \
             --stats {first_stats_file} \
             --stats {second_stats_file} -O {j.combined_stats}
     """
-
-    j.command(command(cmd))
+    )
 
     return j
 
@@ -518,15 +495,16 @@ def filter_variants(
     f_score_beta = config.config_retrieve(['mito_snv', 'f_score_beta'])
     reference = get_mito_references()
     batch_instance = hail_batch.get_batch()
-    job_attrs = job_attrs or {} | dict(tool='gatk_FilterMutectCalls')
-    j = batch_instance.new_job('filter_variants', job_attrs)
-    j.image(image_path('gatk'))
+    j = batch_instance.new_job('filter_variants', job_attrs | {'tool': 'gatk_FilterMutectCalls'})
+
+    j.image(config.config_retrieve(['images', 'gatk']))
 
     resources.STANDARD.set_resources(j, ncpu=4)
 
+    blacklist_sites = config.config_retrieve(['references', 'blacklist_sites'])
     blacklisted_sites = batch_instance.read_input_group(
-        bed=reference_path('gnomad_mito/blacklist_sites'),
-        idx=reference_path('gnomad_mito/blacklist_sites') + '.idx',
+        bed=blacklist_sites,
+        idx=blacklist_sites + '.idx',
     )
 
     j.declare_resource_group(filtered_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
@@ -537,7 +515,8 @@ def filter_variants(
     else:
         contamination_estimate_string = ''
 
-    cmd = f"""
+    j.command(
+        f"""
       gatk --java-options "-Xmx2500m" FilterMutectCalls -V {vcf['vcf.gz']} \\
         -R {reference.base} \\
         -O {j.filtered_vcf['vcf.gz']} \\
@@ -553,16 +532,15 @@ def filter_variants(
         --mask {blacklisted_sites.bed} \\
         --mask-name "blacklisted_site"
     """
-
-    j.command(command(cmd, define_retry_function=True))
+    )
 
     return j
 
 
 def split_multi_allelics(
     vcf: hb.ResourceGroup,
+    job_attrs: dict,
     remove_non_pass_sites: bool = False,
-    job_attrs: dict | None = None,
 ) -> Job:
     """
     Splits multi allelics and removes non pass sites
@@ -570,7 +548,7 @@ def split_multi_allelics(
     only passing variants.
     Args:
         vcf: Input vcf file.
-        reference: chrM reference fasta.
+        job_attrs: attributes to add to the GCP job
         remove_non_pass_sites:
     Output:
         output_vcf: Final vcf file.
@@ -579,9 +557,8 @@ def split_multi_allelics(
     """
     reference = get_mito_references()
     batch_instance = hail_batch.get_batch()
-    job_attrs = job_attrs or {} | dict(tool='gatk_SelectVariants')
-    j = batch_instance.new_job('split_multi_allelics', job_attrs)
-    j.image(image_path('gatk'))
+    j = batch_instance.new_job('split_multi_allelics', job_attrs | {'tool': 'gatk_SelectVariants'})
+    j.image(config.config_retrieve(['images', 'gatk']))
 
     resources.STANDARD.set_resources(j, ncpu=4)
 
@@ -611,7 +588,7 @@ def split_multi_allelics(
             mv {j.split_vcf['vcf.gz.tbi']} {j.output_vcf['vcf.bgz.tbi']}
         """
 
-    j.command(command(cmd, define_retry_function=True))
+    j.command(cmd)
 
     return j
 
@@ -638,18 +615,19 @@ def get_contamination(
     batch_instance = hail_batch.get_batch()
     job_attrs = job_attrs or {} | dict(tool='haplocheckcli')
     j = batch_instance.new_job('get_contamination', job_attrs)
-    j.image(image_path('haplocheckcli'))
+    j.image(config.config_retrieve(['images', 'haplocheckcli']))
 
     resources.STANDARD.set_resources(j, ncpu=2)
 
-    cmd = f"""
+    j.command(
+        f"""
         mv {vcf['vcf.bgz']} {vcf}.vcf.gz
         PARENT_DIR="$(dirname "{vcf['vcf.bgz']}")"
         java -jar /haplocheckCLI.jar "$PARENT_DIR"
         mv output {j.haplocheck_output}
         """
+    )
 
-    j.command(command(cmd, define_retry_function=True))
     if haplocheck_output:
         batch_instance.write_output(j.haplocheck_output, str(haplocheck_output))
 
@@ -678,7 +656,7 @@ def parse_contamination_results(
     batch_instance = hail_batch.get_batch()
     job_attrs = job_attrs or {}
     j = batch_instance.new_python_job('parse_contamination_results', job_attrs)
-    j.image(get_config()['workflow']['driver_image'])
+    j.image(config.config_retrieve(['workflow', 'driver_image']))
 
     resources.STANDARD.set_resources(j, ncpu=4)
 
@@ -740,7 +718,7 @@ def mitoreport(
     mito_ref = get_mito_references()
     batch_instance = hail_batch.get_batch()
     j = batch_instance.new_job('mitoreport', job_attrs | {'tool': 'mitoreport'})
-    j.image(image_path('mitoreport'))
+    j.image(config.config_retrieve(['images', 'mitoreport']))
 
     res = resources.STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)
@@ -753,7 +731,9 @@ def mitoreport(
         },
     )
 
-    cmd = f"""
+    hail_batch.authenticate_cloud_credentials_in_job(j)
+    j.command(
+        f"""
         samtools view -T {mito_ref.base} -b -o {sequencing_group.id}.bam {cram['cram']}
         samtools index {sequencing_group.id}.bam
 
@@ -764,14 +744,8 @@ def mitoreport(
             -vcf {vcf['vcf.gz']} \
             {sequencing_group.id}.bam ./resources/controls/*.bam
 
-        gsutil -m cp -r 'mitoreport-{sequencing_group.id}/*' {output_path.parent}
+        gcloud storage cp -r 'mitoreport-{sequencing_group.id}/*' {output_path.parent}
         """
-
-    j.command(
-        command(
-            cmd,
-            setup_gcp=True,
-        ),
     )
 
     return j

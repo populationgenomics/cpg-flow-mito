@@ -3,21 +3,14 @@ Stage to call SNVs in the mitochondrial genome of a single sequencing_group.
 
 Reimplemented version of;
 https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/MitochondriaPipeline.wdl
-
 """
-
-from functools import cache
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_utils import Path, hail_batch, config
-from cpg_utils.config import get_config, reference_path
-from cpg_utils.hail_batch import get_batch
-from cpg_flow import workflow, stage
+from cpg_flow import stage
 from cpg_flow_mito.jobs import mito, picard, vep
-# from cpg_workflows.stages.align import Align
-# from cpg_workflows.stages.cram_qc import CramQC
 
 
 @stage.stage(
@@ -63,7 +56,6 @@ class RealignMito(stage.SequencingGroupStage):
             0/0 and ./. genotypes until mutect can generate a gVCF.
         coverage_metrics: CollectWgsMetrics output.
         theoretical_sensitivity_metrics: CollectWgsMetrics output.
-
     """
 
     def expected_outputs(self, sequencing_group: stage.SequencingGroup) -> dict[str, Path]:
@@ -81,7 +73,7 @@ class RealignMito(stage.SequencingGroupStage):
 
     def queue_jobs(self, sequencing_group: stage.SequencingGroup, inputs: stage.StageInput) -> stage.StageOutput | None:
         outputs = self.expected_outputs(sequencing_group)
-
+        job_attrs = self.get_job_attrs(sequencing_group)
         jobs = []
 
         # Extract reads mapped to chrM
@@ -96,7 +88,7 @@ class RealignMito(stage.SequencingGroupStage):
         realign_j = mito.mito_realign(
             sequencing_group_id=sequencing_group.id,
             input_bam=subset_bam_j.output_bam,
-            job_attrs=self.get_job_attrs(sequencing_group),
+            job_attrs=job_attrs,
         )
         jobs.append(realign_j)
         assert isinstance(realign_j.output_cram, hb.ResourceFile)
@@ -105,7 +97,7 @@ class RealignMito(stage.SequencingGroupStage):
         realign_mkdup_j = picard.markdup(
             sorted_bam=realign_j.output_cram,
             output_path=outputs['non_shifted_cram'],
-            job_attrs=self.get_job_attrs(sequencing_group),
+            job_attrs=job_attrs,
         )
         assert isinstance(realign_mkdup_j, Job)
         jobs.append(realign_mkdup_j)
@@ -115,7 +107,7 @@ class RealignMito(stage.SequencingGroupStage):
         shifted_realign_j = mito.mito_realign(
             sequencing_group_id=sequencing_group.id,
             input_bam=subset_bam_j.output_bam,
-            job_attrs=self.get_job_attrs(sequencing_group),
+            job_attrs=job_attrs,
             shifted=True,
         )
         jobs.append(shifted_realign_j)
@@ -125,28 +117,26 @@ class RealignMito(stage.SequencingGroupStage):
         shifted_mkdup_j = picard.markdup(
             sorted_bam=shifted_realign_j.output_cram,
             output_path=self.expected_outputs(sequencing_group)['shifted_cram'],
-            job_attrs=self.get_job_attrs(sequencing_group),
+            job_attrs=job_attrs,
         )
-        assert isinstance(shifted_mkdup_j, Job)
         jobs.append(shifted_mkdup_j)
-        assert isinstance(shifted_mkdup_j.output_cram, hb.ResourceGroup)
 
         # Collect coverage metrics (only on non-shifted)
-        coverage_metrics_J = mito.collect_coverage_metrics(
+        coverage_metrics_job = mito.collect_coverage_metrics(
             cram=realign_mkdup_j.output_cram,
             metrics=self.expected_outputs(sequencing_group)['coverage_metrics'],
             theoretical_sensitivity=self.expected_outputs(sequencing_group)['theoretical_sensitivity_metrics'],
-            job_attrs=self.get_job_attrs(sequencing_group),
+            job_attrs=job_attrs,
         )
-        jobs.append(coverage_metrics_J)
-        assert isinstance(coverage_metrics_J.metrics, hb.ResourceFile)
+        jobs.append(coverage_metrics_job)
+        assert isinstance(coverage_metrics_job.metrics, hb.ResourceFile)
 
         # Extract mean and median coverage (only on non-shifted)
         extract_coverage_mean_j = mito.extract_coverage_mean(
-            metrics=coverage_metrics_J.metrics,
+            metrics=coverage_metrics_job.metrics,
             mean_path=self.expected_outputs(sequencing_group)['coverage_mean'],
             median_path=self.expected_outputs(sequencing_group)['coverage_median'],
-            job_attrs=self.get_job_attrs(sequencing_group),
+            job_attrs=job_attrs,
         )
         jobs.append(extract_coverage_mean_j)
 
@@ -155,14 +145,14 @@ class RealignMito(stage.SequencingGroupStage):
         # considered ./. rather than 0/0.
         non_control_region_coverage_j = mito.coverage_at_every_base(
             cram=realign_mkdup_j.output_cram,
-            job_attrs=self.get_job_attrs(sequencing_group),
+            job_attrs=job_attrs,
         )
         jobs.append(non_control_region_coverage_j)
         assert isinstance(non_control_region_coverage_j.per_base_coverage, hb.ResourceFile)
 
         shifted_control_region_coverage_j = mito.coverage_at_every_base(
             cram=shifted_mkdup_j.output_cram,
-            job_attrs=self.get_job_attrs(sequencing_group),
+            job_attrs=job_attrs,
             shifted=True,
         )
         jobs.append(shifted_control_region_coverage_j)
@@ -173,14 +163,14 @@ class RealignMito(stage.SequencingGroupStage):
             non_cr_coverage=non_control_region_coverage_j.per_base_coverage,
             shifted_cr_coverage=shifted_control_region_coverage_j.per_base_coverage,
             merged_coverage=self.expected_outputs(sequencing_group)['base_level_coverage_metrics'],
-            job_attrs=self.get_job_attrs(sequencing_group),
+            job_attrs=job_attrs,
         )
         jobs.append(merge_coverage_j)
 
         return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
 
 
-@stage(required_stages=[RealignMito, CramQC])
+@stage.stage(required_stages=[RealignMito])
 class GenotypeMito(stage.SequencingGroupStage):
     """
     Call SNVs in the mitochondrial genome of a single sequencing_group.
@@ -233,28 +223,35 @@ class GenotypeMito(stage.SequencingGroupStage):
         }
 
     def queue_jobs(self, sequencing_group: stage.SequencingGroup, inputs: stage.StageInput) -> stage.StageOutput | None:
+        outputs = self.expected_outputs(sequencing_group)
         jobs = []
 
         # Get input resources
-        non_shifted_cram = get_batch().read_input_group(
-            cram=str(inputs.as_path(sequencing_group, RealignMito, 'non_shifted_cram')),
-            crai=str(inputs.as_path(sequencing_group, RealignMito, 'non_shifted_cram')) + '.crai',
+        non_shifted_cram = inputs.as_str(sequencing_group, RealignMito, 'non_shifted_cram')
+        non_shifted_cram_local = hail_batch.get_batch().read_input_group(
+            cram=non_shifted_cram,
+            crai=non_shifted_cram + '.crai',
         )
-        shifted_cram = get_batch().read_input_group(
-            cram=str(inputs.as_path(sequencing_group, RealignMito, 'shifted_cram')),
-            crai=str(inputs.as_path(sequencing_group, RealignMito, 'shifted_cram')) + '.crai',
+
+        shifted_cram = inputs.as_str(sequencing_group, RealignMito, 'shifted_cram')
+        shifted_cram_local = hail_batch.get_batch().read_input_group(
+            cram=shifted_cram,
+            crai=shifted_cram + '.crai',
         )
-        # todo - implement verifyBamID input
-        if config.config_retrieve(['mito_snv', 'use_verifybamid'], None):
-            verifybamid_output = get_batch().read_input(
-                str(inputs.as_path(sequencing_group, CramQC, 'verify_bamid')),
+
+        if config.config_retrieve(['mito_snv', 'use_verifybamid']):
+            verify_bamid_path = (
+                sequencing_group.dataset.prefix() / 'qc' / 'verify_bamid' / f'{sequencing_group.id}.verify-bamid.selfSM'
             )
+            if not verify_bamid_path.exists():
+                raise FileNotFoundError(f'Configured to use verifyBamID but file not found: {verify_bamid_path}')
+            verifybamid_output = hail_batch.get_batch().read_input(verify_bamid_path)
         else:
             verifybamid_output = None
 
         # Call variants on WT genome
         call_j = mito.mito_mutect2(
-            cram=non_shifted_cram,
+            cram=non_shifted_cram_local,
             region='chrM:576-16024',  # Exclude the control region.
             job_attrs=self.get_job_attrs(sequencing_group),
         )
@@ -263,7 +260,7 @@ class GenotypeMito(stage.SequencingGroupStage):
 
         # Call variants in ONLY the control region using the shifted reference
         shifted_call_j = mito.mito_mutect2(
-            cram=shifted_cram,
+            cram=shifted_cram_local,
             region='chrM:8025-9144',  # Only call inside the control region.
             job_attrs=self.get_job_attrs(sequencing_group),
             shifted=True,
@@ -314,7 +311,7 @@ class GenotypeMito(stage.SequencingGroupStage):
         # Estimate level of contamination from mito reads
         get_contamination_j = mito.get_contamination(
             vcf=split_multiallelics_j.output_vcf,
-            haplocheck_output=self.expected_outputs(sequencing_group)['haplocheck_metrics'],
+            haplocheck_output=outputs['haplocheck_metrics'],
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(get_contamination_j)
@@ -349,16 +346,14 @@ class GenotypeMito(stage.SequencingGroupStage):
         jobs.append(split_multiallelics_j)
 
         # Write the final vcf to the bucket
-        output_vcf_root = str(self.expected_outputs(sequencing_group)['out_vcf']).replace('.vcf.bgz', '')
-
-        get_batch().write_output(
+        hail_batch.get_batch().write_output(
             split_multiallelics_j.output_vcf,
-            output_vcf_root,
+            str(outputs['out_vcf']).replace('.vcf.bgz', ''),
         )
-        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
+        return self.make_outputs(sequencing_group, data=outputs, jobs=jobs)
 
 
-@stage(
+@stage.stage(
     required_stages=[RealignMito, GenotypeMito],
     analysis_type='web',
     analysis_keys=['mitoreport'],
@@ -384,13 +379,13 @@ class MitoReport(stage.SequencingGroupStage):
         }
 
     def queue_jobs(self, sequencing_group: stage.SequencingGroup, inputs: stage.StageInput) -> stage.StageOutput | None:
+        outputs = self.expected_outputs(sequencing_group)
+
         jobs = []
 
         vep_j = vep.vep_one(
-            get_batch(),
             vcf=inputs.as_path(sequencing_group, GenotypeMito, 'out_vcf'),
-            out_path=self.expected_outputs(sequencing_group)['vep_vcf'],
-            out_format='vcf',
+            out_path=outputs['vep_vcf'],
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         if vep_j:
@@ -398,13 +393,13 @@ class MitoReport(stage.SequencingGroupStage):
 
         mitoreport_j = mito.mitoreport(
             sequencing_group=sequencing_group,
-            vcf_path=self.expected_outputs(sequencing_group)['vep_vcf'],
+            vcf_path=outputs['vep_vcf'],
             cram_path=inputs.as_path(sequencing_group, RealignMito, 'non_shifted_cram'),
-            output_path=self.expected_outputs(sequencing_group)['mitoreport'],
+            output_path=outputs['mitoreport'],
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         if mitoreport_j:
             mitoreport_j.depends_on(*jobs)
             jobs.append(mitoreport_j)
 
-        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
+        return self.make_outputs(sequencing_group, data=outputs, jobs=jobs)
