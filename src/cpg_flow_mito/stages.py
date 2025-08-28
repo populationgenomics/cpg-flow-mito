@@ -20,52 +20,6 @@ from cpg_flow_mito.jobs import mito, picard, vep
 # from cpg_workflows.stages.cram_qc import CramQC
 
 
-# todo reference this from utils
-@cache
-def get_mito_references(ref_path: str = 'gnomad_mito', shifted: bool = False) -> hb.ResourceGroup:
-    """
-    get various mito config entries, reads them into the current batch
-    single method switches between shifted and non-shifted references
-    Args:
-        ref_path: path in config to the mito reference files
-        shifted: whether to get the shifted reference files
-
-    Returns:
-        dict: mito config entries
-    """
-    shifted_str = 'shifted_' if shifted else ''
-    mito_fa = reference_path(f'{ref_path}/{shifted_str}fasta')
-    return hail_batch.get_batch().read_input_group(
-        dict=reference_path(f'{ref_path}/{shifted_str}dict'),
-        base=mito_fa,
-        amb=mito_fa + '.amb',
-        ann=mito_fa + '.ann',
-        bwt=mito_fa + '.bwt',
-        fai=mito_fa + '.fai',
-        pac=mito_fa + '.pac',
-        sa=mito_fa + '.sa',
-    )
-
-
-# todo reference this from utils
-@cache
-def get_control_region_intervals() -> hb.ResourceGroup:
-    """
-    get mito control region intervals
-    Returns:
-        dict: mito control region intervals
-    """
-
-    return hail_batch.get_batch().read_input_group(
-        control_region_shifted=config.config_retrieve(['references', 'shifted_control_region_interval']),
-        non_control_region=config.config_retrieve(['references', 'non_control_region_interval']),
-    )
-
-
-# alt_allele config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
-MAX_ALT_ALLELE_COUNT = 4
-
-
 @stage.stage(
     analysis_type='mito-cram',
     analysis_keys=['non_shifted_cram'],
@@ -127,10 +81,6 @@ class RealignMito(stage.SequencingGroupStage):
 
     def queue_jobs(self, sequencing_group: stage.SequencingGroup, inputs: stage.StageInput) -> stage.StageOutput | None:
         outputs = self.expected_outputs(sequencing_group)
-        # Mitochondrial specific reference files.
-        mito_ref = get_mito_references()
-        shifted_mito_ref = get_mito_references(shifted=True)
-        intervals = get_control_region_intervals()
 
         jobs = []
 
@@ -146,7 +96,6 @@ class RealignMito(stage.SequencingGroupStage):
         realign_j = mito.mito_realign(
             sequencing_group_id=sequencing_group.id,
             input_bam=subset_bam_j.output_bam,
-            mito_ref=mito_ref,
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(realign_j)
@@ -166,8 +115,8 @@ class RealignMito(stage.SequencingGroupStage):
         shifted_realign_j = mito.mito_realign(
             sequencing_group_id=sequencing_group.id,
             input_bam=subset_bam_j.output_bam,
-            mito_ref=shifted_mito_ref,
             job_attrs=self.get_job_attrs(sequencing_group),
+            shifted=True,
         )
         jobs.append(shifted_realign_j)
         assert isinstance(shifted_realign_j.output_cram, hb.ResourceFile)
@@ -184,9 +133,7 @@ class RealignMito(stage.SequencingGroupStage):
 
         # Collect coverage metrics (only on non-shifted)
         coverage_metrics_J = mito.collect_coverage_metrics(
-            batch_instance=get_batch(),
             cram=realign_mkdup_j.output_cram,
-            reference=mito_ref,
             metrics=self.expected_outputs(sequencing_group)['coverage_metrics'],
             theoretical_sensitivity=self.expected_outputs(sequencing_group)['theoretical_sensitivity_metrics'],
             job_attrs=self.get_job_attrs(sequencing_group),
@@ -208,8 +155,6 @@ class RealignMito(stage.SequencingGroupStage):
         # considered ./. rather than 0/0.
         non_control_region_coverage_j = mito.coverage_at_every_base(
             cram=realign_mkdup_j.output_cram,
-            intervals_list=intervals.non_control_region,
-            reference=mito_ref,
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(non_control_region_coverage_j)
@@ -217,9 +162,8 @@ class RealignMito(stage.SequencingGroupStage):
 
         shifted_control_region_coverage_j = mito.coverage_at_every_base(
             cram=shifted_mkdup_j.output_cram,
-            intervals_list=intervals.control_region_shifted,
-            reference=shifted_mito_ref,
             job_attrs=self.get_job_attrs(sequencing_group),
+            shifted=True,
         )
         jobs.append(shifted_control_region_coverage_j)
         assert isinstance(shifted_control_region_coverage_j.per_base_coverage, hb.ResourceFile)
@@ -289,10 +233,6 @@ class GenotypeMito(stage.SequencingGroupStage):
         }
 
     def queue_jobs(self, sequencing_group: stage.SequencingGroup, inputs: stage.StageInput) -> stage.StageOutput | None:
-        # Mitochondrial specific reference files.
-        mito_ref = get_mito_references()
-        shifted_mito_ref = get_mito_references(shifted=True)
-
         jobs = []
 
         # Get input resources
@@ -304,7 +244,8 @@ class GenotypeMito(stage.SequencingGroupStage):
             cram=str(inputs.as_path(sequencing_group, RealignMito, 'shifted_cram')),
             crai=str(inputs.as_path(sequencing_group, RealignMito, 'shifted_cram')) + '.crai',
         )
-        if get_config()['mito_snv']['use_verifybamid']:
+        # todo - implement verifyBamID input
+        if config.config_retrieve(['mito_snv', 'use_verifybamid'], None):
             verifybamid_output = get_batch().read_input(
                 str(inputs.as_path(sequencing_group, CramQC, 'verify_bamid')),
             )
@@ -314,7 +255,6 @@ class GenotypeMito(stage.SequencingGroupStage):
         # Call variants on WT genome
         call_j = mito.mito_mutect2(
             cram=non_shifted_cram,
-            reference=mito_ref,
             region='chrM:576-16024',  # Exclude the control region.
             job_attrs=self.get_job_attrs(sequencing_group),
         )
@@ -323,25 +263,18 @@ class GenotypeMito(stage.SequencingGroupStage):
 
         # Call variants in ONLY the control region using the shifted reference
         shifted_call_j = mito.mito_mutect2(
-            batch_instance=get_batch(),
             cram=shifted_cram,
-            reference=shifted_mito_ref,
             region='chrM:8025-9144',  # Only call inside the control region.
             job_attrs=self.get_job_attrs(sequencing_group),
+            shifted=True,
         )
         jobs.append(shifted_call_j)
         assert isinstance(shifted_call_j.output_vcf, hb.ResourceGroup)
 
-        # read in the shift-back chain file
-        shift_back_chain = get_batch().read_input(str(reference_path('gnomad_mito/shift_back_chain')))
-
         # Merge the wt and shifted VCFs
         merge_j = mito.liftover_and_combine_vcfs(
-            batch_instance=get_batch(),
             vcf=call_j.output_vcf,
             shifted_vcf=shifted_call_j.output_vcf,
-            reference=mito_ref,
-            shift_back_chain=shift_back_chain,
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(merge_j)
@@ -349,7 +282,6 @@ class GenotypeMito(stage.SequencingGroupStage):
 
         # Merge the mutect stats output files (needed for filtering)
         merge_stats_j = mito.merge_mutect_stats(
-            batch_instance=get_batch(),
             first_stats_file=call_j.output_vcf['vcf.gz.stats'],
             second_stats_file=shifted_call_j.output_vcf['vcf.gz.stats'],
             job_attrs=self.get_job_attrs(sequencing_group),
@@ -359,15 +291,11 @@ class GenotypeMito(stage.SequencingGroupStage):
 
         # Initial round of filtering to exclude blacklist and high alt alleles
         initial_filter_j = mito.filter_variants(
-            batch_instance=get_batch(),
             vcf=merge_j.output_vcf,
-            reference=mito_ref,
             merged_mutect_stats=merge_stats_j.combined_stats,
             # alt_allele and vaf config hardcoded in this round of filtering as per
             # https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
-            max_alt_allele_count=MAX_ALT_ALLELE_COUNT,
             min_allele_fraction=0,
-            f_score_beta=get_config()['mito_snv']['f_score_beta'],
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(initial_filter_j)
@@ -376,9 +304,7 @@ class GenotypeMito(stage.SequencingGroupStage):
         # SplitMultiAllelics AND remove non-passing sites
         # Output is only used for input to haplocheck
         split_multiallelics_j = mito.split_multi_allelics(
-            batch_instance=get_batch(),
             vcf=initial_filter_j.output_vcf,
-            reference=mito_ref,
             remove_non_pass_sites=True,
             job_attrs=self.get_job_attrs(sequencing_group),
         )
@@ -387,7 +313,6 @@ class GenotypeMito(stage.SequencingGroupStage):
 
         # Estimate level of contamination from mito reads
         get_contamination_j = mito.get_contamination(
-            batch_instance=get_batch(),
             vcf=split_multiallelics_j.output_vcf,
             haplocheck_output=self.expected_outputs(sequencing_group)['haplocheck_metrics'],
             job_attrs=self.get_job_attrs(sequencing_group),
@@ -397,7 +322,6 @@ class GenotypeMito(stage.SequencingGroupStage):
 
         # Parse contamination estimate reports
         parse_contamination_j, contamination_level = mito.parse_contamination_results(
-            batch_instance=get_batch(),
             haplocheck_output=get_contamination_j.haplocheck_output,
             verifybamid_output=verifybamid_output,
             job_attrs=self.get_job_attrs(sequencing_group),
@@ -406,14 +330,9 @@ class GenotypeMito(stage.SequencingGroupStage):
 
         # Filter round 2 - remove variants with VAF below estimated contamination
         second_filter_j = mito.filter_variants(
-            batch_instance=get_batch(),
             vcf=initial_filter_j.output_vcf,
-            reference=mito_ref,
             merged_mutect_stats=merge_stats_j.combined_stats,
             # alt_allele config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
-            max_alt_allele_count=MAX_ALT_ALLELE_COUNT,
-            min_allele_fraction=get_config()['mito_snv']['vaf_filter_threshold'],
-            f_score_beta=get_config()['mito_snv']['f_score_beta'],
             # contamination_estimate=get_contamination_j.max_contamination,
             contamination_estimate=contamination_level.as_str(),
             job_attrs=self.get_job_attrs(sequencing_group),
@@ -423,9 +342,7 @@ class GenotypeMito(stage.SequencingGroupStage):
 
         # Generate final output vcf
         split_multiallelics_j = mito.split_multi_allelics(
-            batch_instance=get_batch(),
             vcf=second_filter_j.output_vcf,
-            reference=mito_ref,
             remove_non_pass_sites=False,
             job_attrs=self.get_job_attrs(sequencing_group),
         )
@@ -467,7 +384,6 @@ class MitoReport(stage.SequencingGroupStage):
         }
 
     def queue_jobs(self, sequencing_group: stage.SequencingGroup, inputs: stage.StageInput) -> stage.StageOutput | None:
-        mito_ref = get_mito_references()
         jobs = []
 
         vep_j = vep.vep_one(
@@ -484,7 +400,6 @@ class MitoReport(stage.SequencingGroupStage):
             sequencing_group=sequencing_group,
             vcf_path=self.expected_outputs(sequencing_group)['vep_vcf'],
             cram_path=inputs.as_path(sequencing_group, RealignMito, 'non_shifted_cram'),
-            mito_ref=mito_ref,
             output_path=self.expected_outputs(sequencing_group)['mitoreport'],
             job_attrs=self.get_job_attrs(sequencing_group),
         )

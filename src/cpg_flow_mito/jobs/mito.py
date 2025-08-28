@@ -77,8 +77,8 @@ def subset_cram_to_chrM(
 def mito_realign(
     sequencing_group_id: str,
     input_bam: hb.ResourceGroup,
-    mito_ref: hb.ResourceGroup,
     job_attrs: dict[str, str],
+    shifted: bool = False,
 ) -> Job:
     """
     Re-align reads to mitochondrial genome
@@ -102,6 +102,8 @@ def mito_realign(
     batch_instance = hail_batch.get_batch()
     j = batch_instance.new_job('mito_realign', job_attrs | {'tool': 'bwa'})
 
+    mito_ref = get_mito_references(shifted=shifted)
+
     # todo into config
     j.image(image_path('bwa'))
 
@@ -124,7 +126,6 @@ def mito_realign(
 
 def collect_coverage_metrics(
     cram: hb.ResourceGroup,
-    reference: hb.ResourceGroup,
     metrics: Path | None = None,
     theoretical_sensitivity: Path | None = None,
     read_length_for_optimization: int = 151,
@@ -136,7 +137,6 @@ def collect_coverage_metrics(
 
     Args:
         cram: Input Cram
-        reference: reference fastq
         read_length_for_optimization:  Read length used for optimization only. If this is
             too small CollectWgsMetrics might fail, but the results are not affected
             by this number. [Default: 151] [default: 100000 (from wdl)].
@@ -147,9 +147,11 @@ def collect_coverage_metrics(
         metrics: output file
         theoretical_sensitivity: Undocumented CollectWgsMetrics output?
     """
+    reference = get_mito_references()
     batch_instance = hail_batch.get_batch()
-    job_attrs = (job_attrs or {}) | dict(tool='picard_CollectWgsMetrics')
-    j = batch_instance.new_job('collect_coverage_metrics', job_attrs)
+    j = batch_instance.new_job('collect_coverage_metrics', job_attrs | {'tool': 'picard_CollectWgsMetrics'})
+
+    # todo into config
     j.image(image_path('picard'))
 
     resources.STANDARD.set_resources(j, ncpu=2)
@@ -231,25 +233,27 @@ def extract_coverage_mean(
 
 def coverage_at_every_base(
     cram: hb.ResourceGroup,
-    reference: hb.ResourceGroup,
-    intervals_list: hb.ResourceFile,
-    job_attrs: dict | None = None,
+    job_attrs: dict,
+    shifted: bool = False,
 ) -> Job:
     """
     Run picard CollectHsMetrics to calculate read coverage at each base.
 
     Args:
         cram: Input cram
-        reference: Cram reference genome
-        intervals_list: intervals list of target region
 
     Outputs:
         job.per_base_coverage
         job.hs_metrics_out
     """
+    intervals_list = (
+        get_control_region_intervals().control_region_shifted
+        if shifted
+        else get_control_region_intervals().non_control_region
+    )
+    reference = get_mito_references(shifted)
     batch_instance = hail_batch.get_batch()
-    job_attrs = job_attrs or {} | dict(tool='picard_CollectHsMetrics')
-    j = batch_instance.new_job('coverage_at_every_base', job_attrs)
+    j = batch_instance.new_job('coverage_at_every_base', job_attrs | {'tool': 'picard_CollectHsMetrics'})
     j.image(image_path('picard'))
 
     resources.STANDARD.set_resources(j, ncpu=2)
@@ -330,19 +334,20 @@ def merge_coverage(
 
 def mito_mutect2(
     cram: hb.ResourceGroup,
-    reference: hb.ResourceGroup,
     region: str,
     max_reads_per_alignment_start: int = 75,
     job_attrs: dict | None = None,
+    shifted: bool = False,
 ) -> Job:
     """
     Call SNPs and indels in mitochondrial genome using Mutect2 in "mitochondria-mode"
 
     Args:
         cram: Cram to call variants in.
-        reference: Resource group of reference sequence to align to.
         region: Coordinate string restricting the region to call variants within.
         max_reads_per_alignment_start: Mutect argument. [Default: 75].
+        job_attrs
+        shifted: bool, determines which reference group is collected
 
     Output:
         job.output_vcf: resource group containing vcf, index AND statistics file.
@@ -350,6 +355,7 @@ def mito_mutect2(
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L417-L484
     """
+    reference = get_mito_references(shifted)
     batch_instance = hail_batch.get_batch()
     job_attrs = job_attrs or {} | dict(tool='Mutect2')
     j = batch_instance.new_job('mito_mutect2', job_attrs)
@@ -387,8 +393,6 @@ def mito_mutect2(
 def liftover_and_combine_vcfs(
     vcf: hb.ResourceGroup,
     shifted_vcf: hb.ResourceGroup,
-    reference: hb.ResourceGroup,
-    shift_back_chain: hb.ResourceFile,
     job_attrs: dict | None = None,
 ) -> Job:
     """
@@ -406,6 +410,8 @@ def liftover_and_combine_vcfs(
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL360-L415C2
     """
+    shift_back_chain = hail_batch.get_batch().read_input(config.config_retrieve(['references', 'shift_back_chain']))
+    reference = get_mito_references()
     batch_instance = hail_batch.get_batch()
     job_attrs = job_attrs or {} | dict(tool='picard_LiftoverVcf')
     j = batch_instance.new_job('liftover_and_combine_vcfs', job_attrs)
@@ -473,12 +479,9 @@ def merge_mutect_stats(
 
 def filter_variants(
     vcf: hb.ResourceGroup,
-    reference: hb.ResourceGroup,
     merged_mutect_stats: hb.ResourceFile,
-    max_alt_allele_count: int,
-    min_allele_fraction: int,
     contamination_estimate: hb.ResourceFile | None = None,
-    f_score_beta: float = 1.0,
+    min_allele_fraction: int | None = None,
     job_attrs: dict | None = None,
 ) -> Job:
     """
@@ -509,6 +512,11 @@ def filter_variants(
     Note:
         contamination_estimate pre-calculation has been moved out of this function.
     """
+    max_alt_allele_count = config.config_retrieve(['mito_snv', 'max_alt_allele_count'])
+    if min_allele_fraction is None:
+        min_allele_fraction = config.config_retrieve(['mito_snv', 'vaf_filter_threshold'])
+    f_score_beta = config.config_retrieve(['mito_snv', 'f_score_beta'])
+    reference = get_mito_references()
     batch_instance = hail_batch.get_batch()
     job_attrs = job_attrs or {} | dict(tool='gatk_FilterMutectCalls')
     j = batch_instance.new_job('filter_variants', job_attrs)
@@ -553,7 +561,6 @@ def filter_variants(
 
 def split_multi_allelics(
     vcf: hb.ResourceGroup,
-    reference: hb.ResourceGroup,
     remove_non_pass_sites: bool = False,
     job_attrs: dict | None = None,
 ) -> Job:
@@ -570,6 +577,7 @@ def split_multi_allelics(
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L600
     """
+    reference = get_mito_references()
     batch_instance = hail_batch.get_batch()
     job_attrs = job_attrs or {} | dict(tool='gatk_SelectVariants')
     j = batch_instance.new_job('split_multi_allelics', job_attrs)
@@ -723,13 +731,13 @@ def mitoreport(
     sequencing_group: targets.SequencingGroup,
     vcf_path: Path,
     cram_path: Path,
-    mito_ref: hb.ResourceGroup,
     output_path: Path,
     job_attrs: dict,
 ) -> Job:
     """
     Run Mitoreport to generate html report of mito variants
     """
+    mito_ref = get_mito_references()
     batch_instance = hail_batch.get_batch()
     j = batch_instance.new_job('mitoreport', job_attrs | {'tool': 'mitoreport'})
     j.image(image_path('mitoreport'))

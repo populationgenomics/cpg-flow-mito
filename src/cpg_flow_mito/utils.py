@@ -16,12 +16,11 @@ DATE_STRING: str = datetime.now().strftime('%y-%m')  # noqa: DTZ005
 
 
 @cache
-def get_mito_references(ref_path: str = 'gnomad_mito', shifted: bool = False) -> ResourceGroup:
+def get_mito_references(shifted: bool = False) -> ResourceGroup:
     """
     get various mito config entries, reads them into the current batch
     single method switches between shifted and non-shifted references
     Args:
-        ref_path: path in config to the mito reference files
         shifted: whether to get the shifted reference files
 
     Returns:
