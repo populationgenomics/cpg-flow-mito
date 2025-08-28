@@ -71,7 +71,11 @@ class RealignMito(stage.SequencingGroupStage):
             'theoretical_sensitivity_metrics': analysis / 'mito' / f'{sequencing_group.id}.theoretical_sensitivity.txt',
         }
 
-    def queue_jobs(self, sequencing_group: stage.SequencingGroup, inputs: stage.StageInput) -> stage.StageOutput | None:
+    def queue_jobs(
+        self,
+        sequencing_group: stage.SequencingGroup,
+        inputs: stage.StageInput,
+    ) -> stage.StageOutput:
         outputs = self.expected_outputs(sequencing_group)
         job_attrs = self.get_job_attrs(sequencing_group)
         jobs = []
@@ -116,7 +120,7 @@ class RealignMito(stage.SequencingGroupStage):
         # Mark duplicates (shifted)
         shifted_mkdup_j = picard.markdup(
             sorted_bam=shifted_realign_j.output_cram,
-            output_path=self.expected_outputs(sequencing_group)['shifted_cram'],
+            output_path=outputs['shifted_cram'],
             job_attrs=job_attrs,
         )
         jobs.append(shifted_mkdup_j)
@@ -124,8 +128,8 @@ class RealignMito(stage.SequencingGroupStage):
         # Collect coverage metrics (only on non-shifted)
         coverage_metrics_job = mito.collect_coverage_metrics(
             cram=realign_mkdup_j.output_cram,
-            metrics=self.expected_outputs(sequencing_group)['coverage_metrics'],
-            theoretical_sensitivity=self.expected_outputs(sequencing_group)['theoretical_sensitivity_metrics'],
+            metrics=outputs['coverage_metrics'],
+            theoretical_sensitivity=outputs['theoretical_sensitivity_metrics'],
             job_attrs=job_attrs,
         )
         jobs.append(coverage_metrics_job)
@@ -134,8 +138,8 @@ class RealignMito(stage.SequencingGroupStage):
         # Extract mean and median coverage (only on non-shifted)
         extract_coverage_mean_j = mito.extract_coverage_mean(
             metrics=coverage_metrics_job.metrics,
-            mean_path=self.expected_outputs(sequencing_group)['coverage_mean'],
-            median_path=self.expected_outputs(sequencing_group)['coverage_median'],
+            mean_path=outputs['coverage_mean'],
+            median_path=outputs['coverage_median'],
             job_attrs=job_attrs,
         )
         jobs.append(extract_coverage_mean_j)
@@ -162,12 +166,12 @@ class RealignMito(stage.SequencingGroupStage):
         merge_coverage_j = mito.merge_coverage(
             non_cr_coverage=non_control_region_coverage_j.per_base_coverage,
             shifted_cr_coverage=shifted_control_region_coverage_j.per_base_coverage,
-            merged_coverage=self.expected_outputs(sequencing_group)['base_level_coverage_metrics'],
+            merged_coverage=outputs['base_level_coverage_metrics'],
             job_attrs=job_attrs,
         )
         jobs.append(merge_coverage_j)
 
-        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
+        return self.make_outputs(sequencing_group, data=outputs, jobs=jobs)
 
 
 @stage.stage(required_stages=[RealignMito])
@@ -205,13 +209,9 @@ class GenotypeMito(stage.SequencingGroupStage):
     Configuration options:
         The following are surfaced as configurable parameters in the Broad WDL. Other
         parameters hardcoded in the WDL are also hardcoded in this pipeline.
-        mito_snv.vaf_filter_threshold: "Hard threshold for filtering low VAF sites"
-        mito_snv.f_score_beta: "F-Score beta balances the filtering strategy between
+        references.vaf_filter_threshold: "Hard threshold for filtering low VAF sites"
+        references.f_score_beta: "F-Score beta balances the filtering strategy between
             recall and precision. The relative weight of recall to precision."
-
-    Not Implemented:
-        - The Broad wdl allows for use of verifyBamID as a second input for contamination
-            estimation. This has not been implemented yet but is probably a good idea.
     """
 
     def expected_outputs(self, sequencing_group: stage.SequencingGroup) -> dict[str, Path]:
@@ -222,7 +222,11 @@ class GenotypeMito(stage.SequencingGroupStage):
             'haplocheck_metrics': analysis / 'mito' / f'{sequencing_group.id}.haplocheck.txt',
         }
 
-    def queue_jobs(self, sequencing_group: stage.SequencingGroup, inputs: stage.StageInput) -> stage.StageOutput | None:
+    def queue_jobs(
+        self,
+        sequencing_group: stage.SequencingGroup,
+        inputs: stage.StageInput,
+    ) -> stage.StageOutput:
         outputs = self.expected_outputs(sequencing_group)
         jobs = []
 
@@ -239,7 +243,7 @@ class GenotypeMito(stage.SequencingGroupStage):
             crai=shifted_cram + '.crai',
         )
 
-        if config.config_retrieve(['mito_snv', 'use_verifybamid']):
+        if config.config_retrieve(['workflow', 'use_verifybamid']):
             verify_bamid_path = (
                 sequencing_group.dataset.prefix() / 'qc' / 'verify_bamid' / f'{sequencing_group.id}.verify-bamid.selfSM'
             )
@@ -378,7 +382,11 @@ class MitoReport(stage.SequencingGroupStage):
             'mitoreport': web / 'mito' / f'mitoreport-{sequencing_group.id}' / 'index.html',
         }
 
-    def queue_jobs(self, sequencing_group: stage.SequencingGroup, inputs: stage.StageInput) -> stage.StageOutput | None:
+    def queue_jobs(
+        self,
+        sequencing_group: stage.SequencingGroup,
+        inputs: stage.StageInput,
+    ) -> stage.StageOutput:
         outputs = self.expected_outputs(sequencing_group)
 
         jobs = []

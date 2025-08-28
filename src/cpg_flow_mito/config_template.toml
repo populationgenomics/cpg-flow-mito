@@ -2,11 +2,10 @@
 # demonstrating some of the common options used in cpg-flow
 [workflow]
 
-# TODO(you): update this to reflect the workflow's name
-name = 'workflow_name'
+# the paths here are currently per-SG, so this isn't incorporated into output paths
+# it will be once we hit joint-calling/aggregation steps
+name = 'cpg_flow_mito'
 
-# mandatory fields for cpg-flow, not populated by analysis-runner
-# TODO(you): update this to contain a real cohort for the given sequencing type
 input_cohorts = []
 sequencing_type = 'genome'
 
@@ -15,6 +14,9 @@ check_expected_outputs = true
 
 # the method to register outputs, can be missing - will not generate metamist analysis entries
 status_reporter = 'metamist'
+
+# Use verifybamid in addition to haplocheck for contamination estimate
+use_verifybamid = true
 
 [references]
 dict = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.dict"
@@ -28,16 +30,14 @@ blacklist_sites = "gs://cpg-common-main/references/hg38/v0/chrM/blacklist_sites.
 
 vep_mount = "gs://cpg-common-main/references/vep/110/mount"
 
-[mito_snv]
 # Example config for broad wdl found here:
 # https://raw.githubusercontent.com/broadinstitute/gatk/master/scripts/mitochondria_m2_wdl/ExampleInputsMitochondriaPipeline.json
+
 # f_score_beta is not configured so will use tool default of 1.0
 f_score_beta = 1.0
 # Sarah Stenton from Broad runs this pipline for seqr ingest and indicated they use a
 # threshold of 0.01 for seqr cohorts.
 vaf_filter_threshold = 0.01
-# Use verifybamid in addition to haplocheck for contamination estimate
-use_verifybamid = true
 
 # https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
 max_alt_allele_count = 4

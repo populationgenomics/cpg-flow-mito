@@ -33,12 +33,12 @@ def subset_cram_to_chrM(
     """
     batch_instance = hail_batch.get_batch()
 
-    j = batch_instance.new_job('subset_cram_to_chrM', job_attrs | {'tool': 'gatk_PrintReads'})
+    j = batch_instance.new_bash_job('subset_cram_to_chrM', job_attrs | {'tool': 'gatk_PrintReads'})
     j.image(config.config_retrieve(['images', 'gatk']))
-
-    resources.STANDARD.set_resources(j, ncpu=2)
+    j.cpu(2)
 
     reference = hail_batch.fasta_res_group(batch_instance)
+
     j.declare_resource_group(
         output_bam={
             'bam': '{root}.bam',
@@ -80,18 +80,17 @@ def mito_realign(
     Args:
         sequencing_group_id: CPG sequencing_group id for inclusion in RG header
         input_bam: Bam for realignment
-        mito_ref: Resource group containing the mito genome and bwa index to align to
         job_attrs: Dictionary of job attributes to add to the job.
+        shifted: bool, determines which reference group is collected
 
     Outputs:
         job.output_cram: A sorted cram
 
     Bwa command from:
     https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignmentPipeline.wdl#L59
-
     """
     batch_instance = hail_batch.get_batch()
-    j = batch_instance.new_job('mito_realign', job_attrs | {'tool': 'bwa'})
+    j = batch_instance.new_bash_job('mito_realign', job_attrs | {'tool': 'bwa'})
 
     mito_ref = get_mito_references(shifted=shifted)
 
@@ -117,11 +116,11 @@ def mito_realign(
 
 def collect_coverage_metrics(
     cram: hb.ResourceGroup,
-    metrics: Path | None = None,
-    theoretical_sensitivity: Path | None = None,
+    metrics: Path,
+    theoretical_sensitivity: Path,
+    job_attrs: dict,
     read_length_for_optimization: int = 151,
     coverage_cap: int = 100000,
-    job_attrs: dict | None = None,
 ) -> Job:
     """
     Run CollectWgsMetrics
@@ -140,11 +139,10 @@ def collect_coverage_metrics(
     """
     reference = get_mito_references()
     batch_instance = hail_batch.get_batch()
-    j = batch_instance.new_job('collect_coverage_metrics', job_attrs | {'tool': 'picard_CollectWgsMetrics'})
+    j = batch_instance.new_bash_job('collect_coverage_metrics', job_attrs | {'tool': 'picard_CollectWgsMetrics'})
 
     j.image(config.config_retrieve(['images', 'picard']))
-
-    resources.STANDARD.set_resources(j, ncpu=2)
+    j.cpu(2)
 
     j.command(f"""
         picard \
@@ -161,10 +159,8 @@ def collect_coverage_metrics(
 
     """)
 
-    if metrics:
-        batch_instance.write_output(j.metrics, str(metrics))
-    if theoretical_sensitivity:
-        batch_instance.write_output(j.theoretical_sensitivity, str(theoretical_sensitivity))
+    batch_instance.write_output(j.metrics, str(metrics))
+    batch_instance.write_output(j.theoretical_sensitivity, str(theoretical_sensitivity))
 
     return j
 
@@ -189,7 +185,7 @@ def extract_coverage_mean(
     """
     batch_instance = hail_batch.get_batch()
     job_attrs = job_attrs or {} | dict(tool='R')
-    j = batch_instance.new_job('extract_coverage_mean', job_attrs)
+    j = batch_instance.new_bash_job('extract_coverage_mean', job_attrs)
     j.image(config.config_retrieve(['images', 'peer']))
 
     resources.STANDARD.set_resources(j, ncpu=2)
@@ -242,7 +238,7 @@ def coverage_at_every_base(
     )
     reference = get_mito_references(shifted)
 
-    j = batch_instance.new_job('coverage_at_every_base', job_attrs | {'tool': 'picard_CollectHsMetrics'})
+    j = batch_instance.new_bash_job('coverage_at_every_base', job_attrs | {'tool': 'picard_CollectHsMetrics'})
     j.image(config.config_retrieve(['images', 'picard']))
 
     resources.STANDARD.set_resources(j, ncpu=2)
@@ -281,7 +277,7 @@ def merge_coverage(
         job.merged_coverage: Merged coverage tsv.
     """
     batch_instance = hail_batch.get_batch()
-    j = batch_instance.new_job('merge_coverage', job_attrs | {'tool': 'R'})
+    j = batch_instance.new_bash_job('merge_coverage', job_attrs | {'tool': 'R'})
     j.image(config.config_retrieve(['images', 'peer']))
 
     resources.STANDARD.set_resources(j, ncpu=2)
@@ -341,7 +337,7 @@ def mito_mutect2(
     reference = get_mito_references(shifted)
     batch_instance = hail_batch.get_batch()
 
-    j = batch_instance.new_job('mito_mutect2', job_attrs | {'tool': 'Mutect2'})
+    j = batch_instance.new_bash_job('mito_mutect2', job_attrs | {'tool': 'Mutect2'})
     j.image(config.config_retrieve(['images', 'gatk']))
 
     res = resources.STANDARD.set_resources(j, ncpu=4)
@@ -394,7 +390,7 @@ def liftover_and_combine_vcfs(
     shift_back_chain = hail_batch.get_batch().read_input(config.config_retrieve(['references', 'shift_back_chain']))
     reference = get_mito_references()
     batch_instance = hail_batch.get_batch()
-    j = batch_instance.new_job('liftover_and_combine_vcfs', job_attrs | {'tool': 'liftover_and_combine_vcfs'})
+    j = batch_instance.new_bash_job('liftover_and_combine_vcfs', job_attrs | {'tool': 'liftover_and_combine_vcfs'})
     j.image(config.config_retrieve(['images', 'picard']))
 
     resources.STANDARD.set_resources(j, ncpu=4)
@@ -438,7 +434,7 @@ def merge_mutect_stats(
     https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL573-L598C2
     """
     batch_instance = hail_batch.get_batch()
-    j = batch_instance.new_job('merge_stats', job_attrs | {'tool': 'gatk_MergeMutectStats'})
+    j = batch_instance.new_bash_job('merge_stats', job_attrs | {'tool': 'gatk_MergeMutectStats'})
     j.image(config.config_retrieve(['images', 'gatk']))
 
     resources.STANDARD.set_resources(j, ncpu=4)
@@ -489,13 +485,13 @@ def filter_variants(
     Note:
         contamination_estimate pre-calculation has been moved out of this function.
     """
-    max_alt_allele_count = config.config_retrieve(['mito_snv', 'max_alt_allele_count'])
+    max_alt_allele_count = config.config_retrieve(['references', 'max_alt_allele_count'])
     if min_allele_fraction is None:
-        min_allele_fraction = config.config_retrieve(['mito_snv', 'vaf_filter_threshold'])
-    f_score_beta = config.config_retrieve(['mito_snv', 'f_score_beta'])
+        min_allele_fraction = config.config_retrieve(['references', 'vaf_filter_threshold'])
+    f_score_beta = config.config_retrieve(['references', 'f_score_beta'])
     reference = get_mito_references()
     batch_instance = hail_batch.get_batch()
-    j = batch_instance.new_job('filter_variants', job_attrs | {'tool': 'gatk_FilterMutectCalls'})
+    j = batch_instance.new_bash_job('filter_variants', job_attrs | {'tool': 'gatk_FilterMutectCalls'})
 
     j.image(config.config_retrieve(['images', 'gatk']))
 
@@ -557,7 +553,7 @@ def split_multi_allelics(
     """
     reference = get_mito_references()
     batch_instance = hail_batch.get_batch()
-    j = batch_instance.new_job('split_multi_allelics', job_attrs | {'tool': 'gatk_SelectVariants'})
+    j = batch_instance.new_bash_job('split_multi_allelics', job_attrs | {'tool': 'gatk_SelectVariants'})
     j.image(config.config_retrieve(['images', 'gatk']))
 
     resources.STANDARD.set_resources(j, ncpu=4)
@@ -614,7 +610,7 @@ def get_contamination(
     """
     batch_instance = hail_batch.get_batch()
     job_attrs = job_attrs or {} | dict(tool='haplocheckcli')
-    j = batch_instance.new_job('get_contamination', job_attrs)
+    j = batch_instance.new_bash_job('get_contamination', job_attrs)
     j.image(config.config_retrieve(['images', 'haplocheckcli']))
 
     resources.STANDARD.set_resources(j, ncpu=2)
@@ -717,7 +713,7 @@ def mitoreport(
     """
     mito_ref = get_mito_references()
     batch_instance = hail_batch.get_batch()
-    j = batch_instance.new_job('mitoreport', job_attrs | {'tool': 'mitoreport'})
+    j = batch_instance.new_bash_job('mitoreport', job_attrs | {'tool': 'mitoreport'})
     j.image(config.config_retrieve(['images', 'mitoreport']))
 
     res = resources.STANDARD.request_resources(ncpu=2)
