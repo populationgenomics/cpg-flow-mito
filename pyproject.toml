@@ -35,7 +35,7 @@ test = [
 ]
 
 [project.scripts]
-run_workflow = 'cpg_mito.run_workflow:cli_main'
+run_workflow = 'cpg_flow_mito.run_workflow:cli_main'
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/cpg_flow_mito"]
