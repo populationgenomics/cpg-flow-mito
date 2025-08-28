@@ -1,0 +1,27 @@
+# this is a template for the config file
+# demonstrating some of the common options used in cpg-flow
+[workflow]
+
+# TODO(you): update this to reflect the workflow's name
+name = 'workflow_name'
+
+# mandatory fields for cpg-flow, not populated by analysis-runner
+# TODO(you): update this to contain a real cohort for the given sequencing type
+input_cohorts = []
+sequencing_type = 'genome'
+
+# used to make sure we don't repeat previously completed stages
+check_expected_outputs = true
+
+# the method to register outputs, can be missing - will not generate metamist analysis entries
+status_reporter = 'metamist'
+
+[references]
+dict = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.dict"
+fasta = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta"
+shifted_dict = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.dict"
+shifted_fasta = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta"
+shift_back_chain = "gs://cpg-common-main/references/hg38/v0/chrM/ShiftBack.chain"
+shifted_control_region_interval = "gs://cpg-common-main/references/hg38/v0/chrM/control_region_shifted.chrM.interval_list"
+non_control_region_interval = "gs://cpg-common-main/references/hg38/v0/chrM/non_control_region.chrM.interval_list"
+blacklist_sites = "gs://cpg-common-main/references/hg38/v0/chrM/blacklist_sites.hg38.chrM.bed"

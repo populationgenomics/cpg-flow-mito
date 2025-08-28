@@ -6,21 +6,18 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 from hailtop.batch.resource import PythonResult
 
-from cpg_utils import Path, to_path
+from cpg_utils import Path, to_path, config, hail_batch
 from cpg_utils.config import get_config, image_path, reference_path
 from cpg_utils.hail_batch import (
-    Batch,
     command,
     fasta_res_group,
 )
-from cpg_workflows.filetypes import CramPath
-from cpg_workflows.resources import STANDARD
-from cpg_workflows.targets import SequencingGroup
+from cpg_flow import filetypes, resources, targets
+from cpg_flow_mito.utils import get_mito_references, get_control_region_intervals
 
 
 def subset_cram_to_chrM(
-    b,
-    cram_path: CramPath,
+    cram_path: filetypes.CramPath,
     job_attrs: dict | None = None,
 ) -> Job:
     """
@@ -40,14 +37,15 @@ def subset_cram_to_chrM(
     https://github.com/broadinstitute/gatk/blob/330c59a5bcda6a837a545afd2d453361f373fae3/scripts/mitochondria_m2_wdl/MitochondriaPipeline.wdl#LL188-L244C2
 
     """
+    batch_instance = hail_batch.get_batch()
 
     job_attrs = (job_attrs or {}) | dict(tool='gatk_PrintReads')
-    j = b.new_job('subset_cram_to_chrM', job_attrs)
+    j = batch_instance.new_job('subset_cram_to_chrM', job_attrs)
     j.image(image_path('gatk'))
 
-    STANDARD.set_resources(j, ncpu=2)
+    resources.STANDARD.set_resources(j, ncpu=2)
 
-    reference = fasta_res_group(b)
+    reference = fasta_res_group(batch_instance)
     j.declare_resource_group(
         output_bam={
             'bam': '{root}.bam',
@@ -77,11 +75,10 @@ def subset_cram_to_chrM(
 
 
 def mito_realign(
-    b,
     sequencing_group_id: str,
     input_bam: hb.ResourceGroup,
     mito_ref: hb.ResourceGroup,
-    job_attrs: dict | None = None,
+    job_attrs: dict[str, str],
 ) -> Job:
     """
     Re-align reads to mitochondrial genome
@@ -93,6 +90,7 @@ def mito_realign(
         sequencing_group_id: CPG sequencing_group id for inclusion in RG header
         input_bam: Bam for realignment
         mito_ref: Resource group containing the mito genome and bwa index to align to
+        job_attrs: Dictionary of job attributes to add to the job.
 
     Outputs:
         job.output_cram: A sorted cram
@@ -101,11 +99,13 @@ def mito_realign(
     https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignmentPipeline.wdl#L59
 
     """
-    job_attrs = job_attrs or {} | dict(tool='bwa')
-    j = b.new_job('mito_realign', job_attrs)
+    batch_instance = hail_batch.get_batch()
+    j = batch_instance.new_job('mito_realign', job_attrs | {'tool': 'bwa'})
+
+    # todo into config
     j.image(image_path('bwa'))
 
-    nthreads = STANDARD.set_resources(j, ncpu=4).get_nthreads()
+    nthreads = resources.STANDARD.set_resources(j, ncpu=4).get_nthreads()
 
     cmd = f"""\
         bazam -Xmx16g \
@@ -123,7 +123,6 @@ def mito_realign(
 
 
 def collect_coverage_metrics(
-    b,
     cram: hb.ResourceGroup,
     reference: hb.ResourceGroup,
     metrics: Path | None = None,
@@ -148,11 +147,12 @@ def collect_coverage_metrics(
         metrics: output file
         theoretical_sensitivity: Undocumented CollectWgsMetrics output?
     """
+    batch_instance = hail_batch.get_batch()
     job_attrs = (job_attrs or {}) | dict(tool='picard_CollectWgsMetrics')
-    j = b.new_job('collect_coverage_metrics', job_attrs)
+    j = batch_instance.new_job('collect_coverage_metrics', job_attrs)
     j.image(image_path('picard'))
 
-    STANDARD.set_resources(j, ncpu=2)
+    resources.STANDARD.set_resources(j, ncpu=2)
 
     cmd = f"""
         picard \
@@ -171,15 +171,14 @@ def collect_coverage_metrics(
 
     j.command(command(cmd))
     if metrics:
-        b.write_output(j.metrics, str(metrics))
+        batch_instance.write_output(j.metrics, str(metrics))
     if theoretical_sensitivity:
-        b.write_output(j.theoretical_sensitivity, str(theoretical_sensitivity))
+        batch_instance.write_output(j.theoretical_sensitivity, str(theoretical_sensitivity))
 
     return j
 
 
 def extract_coverage_mean(
-    b,
     metrics: hb.ResourceFile,
     mean_path: Path | None = None,
     median_path: Path | None = None,
@@ -197,11 +196,12 @@ def extract_coverage_mean(
         job.mean_coverage: mean coverage of chrM
         job.median_coverage: median coverage of chrM
     """
+    batch_instance = hail_batch.get_batch()
     job_attrs = job_attrs or {} | dict(tool='R')
-    j = b.new_job('extract_coverage_mean', job_attrs)
+    j = batch_instance.new_job('extract_coverage_mean', job_attrs)
     j.image(image_path('peer'))
 
-    STANDARD.set_resources(j, ncpu=2)
+    resources.STANDARD.set_resources(j, ncpu=2)
 
     cmd = f"""
 
@@ -222,15 +222,14 @@ def extract_coverage_mean(
 
     j.command(command(cmd))
     if mean_path:
-        b.write_output(j.mean_coverage, str(mean_path))
+        batch_instance.write_output(j.mean_coverage, str(mean_path))
     if median_path:
-        b.write_output(j.median_coverage, str(median_path))
+        batch_instance.write_output(j.median_coverage, str(median_path))
 
     return j
 
 
 def coverage_at_every_base(
-    b,
     cram: hb.ResourceGroup,
     reference: hb.ResourceGroup,
     intervals_list: hb.ResourceFile,
@@ -248,11 +247,12 @@ def coverage_at_every_base(
         job.per_base_coverage
         job.hs_metrics_out
     """
+    batch_instance = hail_batch.get_batch()
     job_attrs = job_attrs or {} | dict(tool='picard_CollectHsMetrics')
-    j = b.new_job('coverage_at_every_base', job_attrs)
+    j = batch_instance.new_job('coverage_at_every_base', job_attrs)
     j.image(image_path('picard'))
 
-    STANDARD.set_resources(j, ncpu=2)
+    resources.STANDARD.set_resources(j, ncpu=2)
 
     cmd = f"""
     picard CollectHsMetrics \
@@ -273,7 +273,6 @@ def coverage_at_every_base(
 
 
 def merge_coverage(
-    b,
     non_cr_coverage: hb.ResourceFile,
     shifted_cr_coverage: hb.ResourceFile,
     merged_coverage: Path,
@@ -292,11 +291,12 @@ def merge_coverage(
     Outputs:
         job.merged_coverage: Merged coverage tsv.
     """
+    batch_instance = hail_batch.get_batch()
     job_attrs = job_attrs or {} | dict(tool='R')
-    j = b.new_job('merge_coverage', job_attrs)
+    j = batch_instance.new_job('merge_coverage', job_attrs)
     j.image(image_path('peer'))
 
-    STANDARD.set_resources(j, ncpu=2)
+    resources.STANDARD.set_resources(j, ncpu=2)
 
     cmd = f"""
     R --vanilla <<CODE
@@ -323,13 +323,12 @@ def merge_coverage(
     """
 
     j.command(command(cmd))
-    b.write_output(j.merged_coverage, str(merged_coverage))
+    batch_instance.write_output(j.merged_coverage, str(merged_coverage))
 
     return j
 
 
 def mito_mutect2(
-    b,
     cram: hb.ResourceGroup,
     reference: hb.ResourceGroup,
     region: str,
@@ -351,11 +350,12 @@ def mito_mutect2(
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L417-L484
     """
+    batch_instance = hail_batch.get_batch()
     job_attrs = job_attrs or {} | dict(tool='Mutect2')
-    j = b.new_job('mito_mutect2', job_attrs)
+    j = batch_instance.new_job('mito_mutect2', job_attrs)
     j.image(image_path('gatk'))
 
-    res = STANDARD.set_resources(j, ncpu=4)
+    res = resources.STANDARD.set_resources(j, ncpu=4)
 
     j.declare_resource_group(
         output_vcf={
@@ -385,7 +385,6 @@ def mito_mutect2(
 
 
 def liftover_and_combine_vcfs(
-    b,
     vcf: hb.ResourceGroup,
     shifted_vcf: hb.ResourceGroup,
     reference: hb.ResourceGroup,
@@ -402,16 +401,17 @@ def liftover_and_combine_vcfs(
         shift_back_chain: chain file provided with shifted genome.
 
     Outputs:
-        job.output_vcf: Merged vcf.gz in standard hg38 coordinate space.
+        job.output_vcf: Merged vcf.gz in resources.STANDARD hg38 coordinate space.
 
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL360-L415C2
     """
+    batch_instance = hail_batch.get_batch()
     job_attrs = job_attrs or {} | dict(tool='picard_LiftoverVcf')
-    j = b.new_job('liftover_and_combine_vcfs', job_attrs)
+    j = batch_instance.new_job('liftover_and_combine_vcfs', job_attrs)
     j.image(image_path('picard'))
 
-    STANDARD.set_resources(j, ncpu=4)
+    resources.STANDARD.set_resources(j, ncpu=4)
 
     j.declare_resource_group(lifted_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
     j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
@@ -436,7 +436,6 @@ def liftover_and_combine_vcfs(
 
 
 def merge_mutect_stats(
-    b,
     first_stats_file: hb.ResourceFile,
     second_stats_file: hb.ResourceFile,
     job_attrs: dict | None = None,
@@ -454,11 +453,12 @@ def merge_mutect_stats(
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL573-L598C2
     """
+    batch_instance = hail_batch.get_batch()
     job_attrs = job_attrs or {} | dict(tool='gatk_MergeMutectStats')
-    j = b.new_job('merge_stats', job_attrs)
+    j = batch_instance.new_job('merge_stats', job_attrs)
     j.image(image_path('gatk'))
 
-    STANDARD.set_resources(j, ncpu=4)
+    resources.STANDARD.set_resources(j, ncpu=4)
 
     cmd = f"""
         gatk MergeMutectStats \
@@ -472,7 +472,6 @@ def merge_mutect_stats(
 
 
 def filter_variants(
-    b,
     vcf: hb.ResourceGroup,
     reference: hb.ResourceGroup,
     merged_mutect_stats: hb.ResourceFile,
@@ -510,13 +509,14 @@ def filter_variants(
     Note:
         contamination_estimate pre-calculation has been moved out of this function.
     """
+    batch_instance = hail_batch.get_batch()
     job_attrs = job_attrs or {} | dict(tool='gatk_FilterMutectCalls')
-    j = b.new_job('filter_variants', job_attrs)
+    j = batch_instance.new_job('filter_variants', job_attrs)
     j.image(image_path('gatk'))
 
-    STANDARD.set_resources(j, ncpu=4)
+    resources.STANDARD.set_resources(j, ncpu=4)
 
-    blacklisted_sites = b.read_input_group(
+    blacklisted_sites = batch_instance.read_input_group(
         bed=reference_path('gnomad_mito/blacklist_sites'),
         idx=reference_path('gnomad_mito/blacklist_sites') + '.idx',
     )
@@ -552,7 +552,6 @@ def filter_variants(
 
 
 def split_multi_allelics(
-    b,
     vcf: hb.ResourceGroup,
     reference: hb.ResourceGroup,
     remove_non_pass_sites: bool = False,
@@ -571,11 +570,12 @@ def split_multi_allelics(
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L600
     """
+    batch_instance = hail_batch.get_batch()
     job_attrs = job_attrs or {} | dict(tool='gatk_SelectVariants')
-    j = b.new_job('split_multi_allelics', job_attrs)
+    j = batch_instance.new_job('split_multi_allelics', job_attrs)
     j.image(image_path('gatk'))
 
-    STANDARD.set_resources(j, ncpu=4)
+    resources.STANDARD.set_resources(j, ncpu=4)
 
     j.declare_resource_group(split_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
     # Downstream hail steps prefer explicit .bgz suffix
@@ -609,7 +609,6 @@ def split_multi_allelics(
 
 
 def get_contamination(
-    b,
     vcf: hb.ResourceGroup,
     haplocheck_output: Path | None,
     job_attrs: dict | None = None,
@@ -628,11 +627,12 @@ def get_contamination(
     Cmd from:
       https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L239
     """
+    batch_instance = hail_batch.get_batch()
     job_attrs = job_attrs or {} | dict(tool='haplocheckcli')
-    j = b.new_job('get_contamination', job_attrs)
+    j = batch_instance.new_job('get_contamination', job_attrs)
     j.image(image_path('haplocheckcli'))
 
-    STANDARD.set_resources(j, ncpu=2)
+    resources.STANDARD.set_resources(j, ncpu=2)
 
     cmd = f"""
         mv {vcf['vcf.bgz']} {vcf}.vcf.gz
@@ -643,13 +643,12 @@ def get_contamination(
 
     j.command(command(cmd, define_retry_function=True))
     if haplocheck_output:
-        b.write_output(j.haplocheck_output, str(haplocheck_output))
+        batch_instance.write_output(j.haplocheck_output, str(haplocheck_output))
 
     return j
 
 
 def parse_contamination_results(
-    b,
     haplocheck_output: hb.ResourceFile,
     verifybamid_output: hb.ResourceFile | None = None,
     job_attrs: dict | None = None,
@@ -668,11 +667,12 @@ def parse_contamination_results(
     Output:
         returns contamination level as a PythonResult
     """
+    batch_instance = hail_batch.get_batch()
     job_attrs = job_attrs or {}
-    j = b.new_python_job('parse_contamination_results', job_attrs)
+    j = batch_instance.new_python_job('parse_contamination_results', job_attrs)
     j.image(get_config()['workflow']['driver_image'])
 
-    STANDARD.set_resources(j, ncpu=4)
+    resources.STANDARD.set_resources(j, ncpu=4)
 
     def parse_contamination_worker(haplocheck_report: str, verifybamid_report: str | None) -> float:
         """
@@ -720,26 +720,25 @@ def parse_contamination_results(
 
 
 def mitoreport(
-    b: Batch,
-    sequencing_group: SequencingGroup,
+    sequencing_group: targets.SequencingGroup,
     vcf_path: Path,
     cram_path: Path,
     mito_ref: hb.ResourceGroup,
     output_path: Path,
-    job_attrs: dict | None = None,
+    job_attrs: dict,
 ) -> Job:
     """
     Run Mitoreport to generate html report of mito variants
     """
-    job_attrs = (job_attrs or {}) | dict(tool='mitoreport')
-    j = b.new_job('mitoreport', job_attrs)
+    batch_instance = hail_batch.get_batch()
+    j = batch_instance.new_job('mitoreport', job_attrs | {'tool': 'mitoreport'})
     j.image(image_path('mitoreport'))
 
-    res = STANDARD.request_resources(ncpu=2)
+    res = resources.STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)
 
-    vcf = b.read_input_group(**{'vcf.gz': str(vcf_path)})
-    cram = b.read_input_group(
+    vcf = batch_instance.read_input_group(**{'vcf.gz': str(vcf_path)})
+    cram = batch_instance.read_input_group(
         **{
             'cram': str(cram_path),
             'cram.crai': str(cram_path.with_suffix('.cram.crai')),
