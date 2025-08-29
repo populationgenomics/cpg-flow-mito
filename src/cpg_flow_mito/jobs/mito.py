@@ -96,7 +96,7 @@ def mito_realign(
 
     j.image(config.config_retrieve(['images', 'bwa']))
 
-    nthreads = resources.STANDARD.set_resources(j, ncpu=4).get_nthreads()
+    nthreads = resources.STANDARD.set_resources(j=j, ncpu=4).get_nthreads()
 
     j.command(
         f"""\
@@ -186,8 +186,7 @@ def extract_coverage_mean(
     batch_instance = hail_batch.get_batch()
     j = batch_instance.new_bash_job('extract_coverage_mean', job_attrs | {'tool': 'R'})
     j.image(config.config_retrieve(['images', 'peer']))
-
-    resources.STANDARD.set_resources(j, ncpu=2)
+    j.cpu(2)
 
     j.command(f"""
     R --vanilla <<CODE
@@ -239,8 +238,7 @@ def coverage_at_every_base(
 
     j = batch_instance.new_bash_job('coverage_at_every_base', job_attrs | {'tool': 'picard_CollectHsMetrics'})
     j.image(config.config_retrieve(['images', 'picard']))
-
-    resources.STANDARD.set_resources(j, ncpu=2)
+    j.cpu(2)
 
     j.command(f"""
     picard CollectHsMetrics \
@@ -278,8 +276,7 @@ def merge_coverage(
     batch_instance = hail_batch.get_batch()
     j = batch_instance.new_bash_job('merge_coverage', job_attrs | {'tool': 'R'})
     j.image(config.config_retrieve(['images', 'peer']))
-
-    resources.STANDARD.set_resources(j, ncpu=2)
+    j.cpu(2)
 
     j.command(f"""
     R --vanilla <<CODE
@@ -338,8 +335,7 @@ def mito_mutect2(
 
     j = batch_instance.new_bash_job('mito_mutect2', job_attrs | {'tool': 'Mutect2'})
     j.image(config.config_retrieve(['images', 'gatk']))
-
-    res = resources.STANDARD.set_resources(j, ncpu=4)
+    j.cpu(4)
 
     j.declare_resource_group(
         output_vcf={
@@ -391,8 +387,7 @@ def liftover_and_combine_vcfs(
     batch_instance = hail_batch.get_batch()
     j = batch_instance.new_bash_job('liftover_and_combine_vcfs', job_attrs | {'tool': 'liftover_and_combine_vcfs'})
     j.image(config.config_retrieve(['images', 'picard']))
-
-    resources.STANDARD.set_resources(j, ncpu=4)
+    j.cpu(4)
 
     j.declare_resource_group(lifted_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
     j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
@@ -435,8 +430,7 @@ def merge_mutect_stats(
     batch_instance = hail_batch.get_batch()
     j = batch_instance.new_bash_job('merge_stats', job_attrs | {'tool': 'gatk_MergeMutectStats'})
     j.image(config.config_retrieve(['images', 'gatk']))
-
-    resources.STANDARD.set_resources(j, ncpu=4)
+    j.cpu(4)
 
     j.command(
         f"""
@@ -495,8 +489,7 @@ def filter_variants(
     j = batch_instance.new_bash_job('filter_variants', job_attrs | {'tool': 'gatk_FilterMutectCalls'})
 
     j.image(config.config_retrieve(['images', 'gatk']))
-
-    resources.STANDARD.set_resources(j, ncpu=4)
+    j.cpu(4)
 
     blacklist_sites = config.config_retrieve(['references', 'blacklist_sites'])
     blacklisted_sites = batch_instance.read_input_group(
@@ -556,8 +549,7 @@ def split_multi_allelics(
     batch_instance = hail_batch.get_batch()
     j = batch_instance.new_bash_job('split_multi_allelics', job_attrs | {'tool': 'gatk_SelectVariants'})
     j.image(config.config_retrieve(['images', 'gatk']))
-
-    resources.STANDARD.set_resources(j, ncpu=4)
+    j.cpu(4)
 
     j.declare_resource_group(split_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
     # Downstream hail steps prefer explicit .bgz suffix
@@ -612,8 +604,7 @@ def get_contamination(
     batch_instance = hail_batch.get_batch()
     j = batch_instance.new_bash_job('get_contamination', job_attrs | {'tool': 'haplocheckcli'})
     j.image(config.config_retrieve(['images', 'haplocheckcli']))
-
-    resources.STANDARD.set_resources(j, ncpu=2)
+    j.cpu(2)
 
     j.command(
         f"""
@@ -652,8 +643,7 @@ def parse_contamination_results(
     job_attrs = job_attrs or {}
     j = batch_instance.new_python_job('parse_contamination_results', job_attrs)
     j.image(config.config_retrieve(['workflow', 'driver_image']))
-
-    resources.STANDARD.set_resources(j, ncpu=4)
+    j.cpu(4)
 
     def parse_contamination_worker(
         haplocheck_report: str,
