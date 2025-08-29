@@ -623,7 +623,7 @@ def get_contamination(
 
 def parse_contamination_results(
     haplocheck_output: hb.ResourceFile | hb.Resource,
-    verifybamid_output: hb.ResourceFile | hb.Resource,
+    verifybamid_output: hb.ResourceFile | hb.Resource | None,
     job_attrs: dict,
 ) -> tuple[Job, PythonResult]:
     """
@@ -674,11 +674,13 @@ def parse_contamination_results(
                 max_contamination = 1.0 - float(report['MeanHetLevelMajor'])
 
         # If verifybamid_report is provided, chose the higher of the two
-        with open(verifybamid_report) as verifybamid:
-            lines = [line.split('\t') for line in verifybamid.readlines()]
-            report = dict(zip(lines[0], lines[1], strict=False))
+        if verifybamid_report:
+            with open(verifybamid_report) as verifybamid:
+                lines = [line.split('\t') for line in verifybamid.readlines()]
+                report = dict(zip(lines[0], lines[1], strict=False))
 
-        return max(max_contamination, float(report['FREEMIX']))
+            return max(max_contamination, float(report['FREEMIX']))
+        return max_contamination
 
     # Call parse_contamination_worker as pythonJob which returns contamination_level as a hail PythonResult.
     contamination_level = j.call(parse_contamination_worker, haplocheck_output, verifybamid_output)
