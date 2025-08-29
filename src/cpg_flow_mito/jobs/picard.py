@@ -31,7 +31,7 @@ def markdup(
     resource = resources.HIGHMEM.request_resources(
         ncpu=4,
         mem_gb=config.config_retrieve(['workflow', 'picard_mem_gb'], None),
-        storage_gb='10GiB',
+        storage_gb=10,
     )
 
     resource.set_to_job(job)
