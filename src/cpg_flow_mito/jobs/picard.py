@@ -27,10 +27,11 @@ def markdup(
     # check for a memory override for impossible sequencing groups
     # if RAM is overridden, update the memory resource setting
     # check for a storage override for unreasonably large sequencing groups
+
     resource = resources.HIGHMEM.request_resources(
         ncpu=4,
         mem_gb=config.config_retrieve(['workflow', 'picard_mem_gb'], None),
-        storage_gb=config.config_retrieve(['workflow', 'picard_storage_gb']),
+        storage_gb='10GiB',
     )
 
     resource.set_to_job(job)
