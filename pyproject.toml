@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name='cpg-flow-mito'
+name='cpg_flow_mito'
 description='Mitochondrial analysis implemented in CPG-Flow'
 readme = "README.md"
 requires-python = ">=3.10,<3.11"
