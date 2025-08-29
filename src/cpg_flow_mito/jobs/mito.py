@@ -335,8 +335,8 @@ def mito_mutect2(
 
     j = batch_instance.new_bash_job('mito_mutect2', job_attrs | {'tool': 'Mutect2'})
     j.image(config.config_retrieve(['images', 'gatk']))
-    res = resources.STANDARD.set_resources(j, ncpu=4)
-    res.set_to_job(j=j)
+    res = resources.STANDARD.set_resources(j=j, ncpu=4)
+    res.set_to_job(j)
 
     j.declare_resource_group(
         output_vcf={
