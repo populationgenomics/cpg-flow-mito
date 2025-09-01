@@ -2,6 +2,8 @@
 Hail Batch jobs needed to call mitochondrial SNVs
 """
 
+import textwrap
+
 import hailtop.batch as hb
 from cpg_flow import filetypes, resources, targets
 from cpg_utils import Path, config, hail_batch, to_path
@@ -188,21 +190,23 @@ def extract_coverage_mean(
     j.image(config.config_retrieve(['images', 'peer']))
     j.cpu(2)
 
-    j.command(f"""
-    R --vanilla <<CODE
-        df = read.table(
-            "{metrics}",skip=6,header=TRUE,stringsAsFactors=FALSE,sep='\\\\t',nrows=1
-        )
-        write.table(
-            floor(df[,"MEAN_COVERAGE"]),
-            "{j.mean_coverage}",
-            quote=F, col.names=F, row.names=F)
-        write.table(
-            df[,"MEDIAN_COVERAGE"],
-            "{j.median_coverage}",
-            quote=F, col.names=F, row.names=F)
-        CODE
+    j.command(
+        textwrap.dedent(f"""
+R --vanilla <<CODE
+df = read.table(
+    "{metrics}",skip=6,header=TRUE,stringsAsFactors=FALSE,sep='\\\\t',nrows=1
+)
+write.table(
+    floor(df[,"MEAN_COVERAGE"]),
+    "{j.mean_coverage}",
+    quote=F, col.names=F, row.names=F)
+write.table(
+    df[,"MEDIAN_COVERAGE"],
+    "{j.median_coverage}",
+    quote=F, col.names=F, row.names=F)
+CODE
     """)
+    )
 
     batch_instance.write_output(j.mean_coverage, str(mean_path))
     batch_instance.write_output(j.median_coverage, str(median_path))
@@ -278,29 +282,31 @@ def merge_coverage(
     j.image(config.config_retrieve(['images', 'peer']))
     j.cpu(2)
 
-    j.command(f"""
-    R --vanilla <<CODE
-      shift_back = function(x) {{
-        if (x < 8570) {{
-          return(x + 8000)
-        }} else {{
-          return (x - 8569)
-        }}
-      }}
+    j.command(
+        textwrap.dedent(f"""
+R --vanilla <<CODE
+shift_back = function(x) {{
+    if (x < 8570) {{
+        return(x + 8000)
+    }} else {{
+        return (x - 8569)
+    }}
+}}
 
-      control_region_shifted = read.table("{shifted_cr_coverage}", header=T)
-      shifted_back = sapply(control_region_shifted[,"pos"], shift_back)
-      control_region_shifted[,"pos"] = shifted_back
+control_region_shifted = read.table("{shifted_cr_coverage}", header=T)
+shifted_back = sapply(control_region_shifted[,"pos"], shift_back)
+control_region_shifted[,"pos"] = shifted_back
 
-      beginning = subset(control_region_shifted, control_region_shifted[,'pos']<8000)
-      end = subset(control_region_shifted, control_region_shifted[,'pos']>8000)
+beginning = subset(control_region_shifted, control_region_shifted[,'pos']<8000)
+end = subset(control_region_shifted, control_region_shifted[,'pos']>8000)
 
-      non_control_region = read.table("{non_cr_coverage}", header=T)
-      combined_table = rbind(beginning, non_control_region, end)
-      write.table(combined_table, "{j.merged_coverage}", row.names=F, col.names=T, quote=F, sep="\\\t")
+non_control_region = read.table("{non_cr_coverage}", header=T)
+combined_table = rbind(beginning, non_control_region, end)
+write.table(combined_table, "{j.merged_coverage}", row.names=F, col.names=T, quote=F, sep="\\\t")
 
-    CODE
+CODE
     """)
+    )
 
     batch_instance.write_output(j.merged_coverage, merged_coverage)
 
