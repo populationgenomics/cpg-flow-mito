@@ -12,13 +12,14 @@ def markdup(
     sorted_bam: hb.Resource,
     job_attrs: dict,
     output_path: Path,
+    shifted: bool = False,
 ) -> BashJob:
     """
     Make job that runs Picard MarkDuplicates and converts the result to CRAM.
     """
     batch_instance = hail_batch.get_batch()
     job = batch_instance.new_bash_job(
-        f'MarkDuplicates {"mito" if "mito" in str(output_path) else ""}',
+        f'MarkDuplicates mito {"(shifted)" if shifted else ""}',
         attributes=job_attrs | {'tool': 'picard_MarkDuplicates'},
     )
 

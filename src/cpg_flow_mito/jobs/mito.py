@@ -61,7 +61,6 @@ def subset_cram_to_chrm(
             --read-filter MateUnmappedAndUnmappedReadFilter \
             -I {mounted_cram_path} \
             -O {j.output_bam.bam}
-
     """)
 
     return j
@@ -149,15 +148,15 @@ def collect_coverage_metrics(
     j.command(f"""
         picard \
             CollectWgsMetrics \
-            INPUT={cram.cram} \
-            VALIDATION_STRINGENCY=SILENT \
-            REFERENCE_SEQUENCE={reference.base} \
-            OUTPUT={j.metrics} \
-            USE_FAST_ALGORITHM=true \
-            READ_LENGTH={read_length_for_optimization} \
-            COVERAGE_CAP={coverage_cap} \
-            INCLUDE_BQ_HISTOGRAM=true \
-            THEORETICAL_SENSITIVITY_OUTPUT={j.theoretical_sensitivity}
+            -INPUT {cram.cram} \
+            -VALIDATION_STRINGENCY SILENT \
+            -REFERENCE_SEQUENCE {reference.base} \
+            -OUTPUT {j.metrics} \
+            -USE_FAST_ALGORITHM true \
+            -READ_LENGTH {read_length_for_optimization} \
+            -COVERAGE_CAP {coverage_cap} \
+            -INCLUDE_BQ_HISTOGRAM true \
+            -THEORETICAL_SENSITIVITY_OUTPUT {j.theoretical_sensitivity}
 
     """)
 
@@ -190,6 +189,7 @@ def extract_coverage_mean(
     j.image(config.config_retrieve(['images', 'peer']))
     j.cpu(2)
 
+    # the CODE input termination must be at the start of the String, so this is fully de-dented
     j.command(
         textwrap.dedent(f"""
 R --vanilla <<CODE
@@ -246,14 +246,14 @@ def coverage_at_every_base(
 
     j.command(f"""
     picard CollectHsMetrics \
-      I={cram.cram} \
-      R={reference.base} \
-      PER_BASE_COVERAGE={j.per_base_coverage} \
-      O={j.hs_metrics_out} \
-      TI={intervals_list} \
-      BI={intervals_list} \
-      COVMAX=20000 \
-      SAMPLE_SIZE=1
+      -I {cram.cram} \
+      -R {reference.base} \
+      -PER_BASE_COVERAGE {j.per_base_coverage} \
+      -O {j.hs_metrics_out} \
+      -TI {intervals_list} \
+      -BI {intervals_list} \
+      -COVMAX 20000 \
+      -SAMPLE_SIZE 1
     """)
     return j
 
@@ -401,11 +401,11 @@ def liftover_and_combine_vcfs(
 
     j.command(f"""
         picard LiftoverVcf \
-            I={shifted_vcf['vcf.gz']} \
-            O={j.lifted_vcf['vcf.gz']} \
-            R={reference.base} \
-            CHAIN={shift_back_chain} \
-            REJECT={j.rejected_vcf}.vcf.gz
+            -I {shifted_vcf['vcf.gz']} \
+            -O {j.lifted_vcf['vcf.gz']} \
+            -R {reference.base} \
+            -CHAIN {shift_back_chain} \
+            -REJECT {j.rejected_vcf}.vcf.gz
 
         picard MergeVcfs \
             I={vcf['vcf.gz']} \

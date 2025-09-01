@@ -115,6 +115,7 @@ class RealignMito(stage.SequencingGroupStage):
             sorted_bam=shifted_realign_j.output_cram,
             output_path=outputs['shifted_cram'],
             job_attrs=job_attrs,
+            shifted=True,
         )
         jobs.append(shifted_mkdup_j)
 
