@@ -7,6 +7,8 @@ from cpg_flow import resources
 from cpg_utils import Path, config, hail_batch
 from hailtop.batch.job import BashJob
 
+from cpg_flow_mito.utils import get_mito_references
+
 
 def markdup(
     sorted_bam: hb.Resource,
@@ -44,22 +46,24 @@ def markdup(
         },
     )
 
-    fasta_reference = hail_batch.fasta_res_group(batch_instance)
+    fasta_reference = get_mito_references(shifted=shifted)
 
     cmd = f"""
     picard {resource.java_mem_options()} MarkDuplicates \\
-    I={sorted_bam} O={job.temp_bam} M={job.markdup_metrics} \\
-    TMP_DIR=$(dirname {job.output_cram.cram})/picard-tmp \\
-    ASSUME_SORT_ORDER=coordinate
+        -I {sorted_bam} \\
+        -O {job.temp_bam} \\
+        -M {job.markdup_metrics} \\
+        -TMP_DIR $(dirname {job.output_cram.cram})/picard-tmp \\
+        -ASSUME_SORT_ORDER coordinate
     echo "MarkDuplicates finished successfully"
 
     rm {sorted_bam}
 
     samtools view --write-index -@{resource.get_nthreads() - 1} \\
-    -T {fasta_reference.base} \\
-    -O cram \\
-    -o {job.output_cram.cram} \\
-    {job.temp_bam}
+        -T {fasta_reference.base} \\
+        -O cram \\
+        -o {job.output_cram.cram} \\
+        {job.temp_bam}
     echo "samtools view finished successfully"
     """
     job.command(hail_batch.command(cmd, monitor_space=True))
