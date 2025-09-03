@@ -252,7 +252,7 @@ def coverage_at_every_base(
       -O {j.hs_metrics_out} \
       -TI {intervals_list} \
       -BI {intervals_list} \
-      -COVMAX 20000 \
+      -covMax 20000 \
       -SAMPLE_SIZE 1
     """)
     return j
