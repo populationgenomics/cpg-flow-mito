@@ -384,7 +384,7 @@ def liftover_and_combine_vcfs(
         shift_back_chain: chain file provided with shifted genome.
 
     Outputs:
-        job.output_vcf: Merged vcf.gz in resources.STANDARD hg38 coordinate space.
+        job.output_vcf: Merged vcf.gz in standard hg38 coordinate space.
 
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL360-L415C2
