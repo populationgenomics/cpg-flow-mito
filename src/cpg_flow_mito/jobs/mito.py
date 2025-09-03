@@ -657,8 +657,7 @@ def parse_contamination_results(
         verifybamid_report: str,
     ) -> float:
         """
-        Process haplocheckCLI and verifyBamID outputs to get contamination level as a
-        single float.
+        Process haplocheckCLI and verifyBamID outputs to get contamination level as a single float.
         """
         cleaned_lines = []
         with open(haplocheck_report) as haplocheck:
@@ -666,7 +665,7 @@ def parse_contamination_results(
             for line in haplocheck:
                 cleaned_lines.append([x.strip('"') for x in line.strip().split('\t')])
         # sanity check and reformat
-        if len(cleaned_lines) != 0 or len(cleaned_lines[0]) != 17:
+        if len(cleaned_lines) != 2 or len(cleaned_lines[0]) != 17:
             raise ValueError(f'Haplocheck report is unexpected format: {cleaned_lines}')
 
         report = dict(zip(cleaned_lines[0], cleaned_lines[1], strict=False))
