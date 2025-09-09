@@ -26,6 +26,7 @@ def subset_cram_to_chrm(
 
     Args:
         cram_path: Input cram to extract chrM reads from.
+        job_attrs: Dictionary of job attributes to add to the job
 
     Outputs:
         job.output_bam: a ResourceGroup containing bam of reads mapped to chrM
@@ -128,6 +129,9 @@ def collect_coverage_metrics(
 
     Args:
         cram: Input Cram
+        metrics: Output Metrics
+        theoretical_sensitivity: Output theoretical sensitivity
+        job_attrs: dictionary of job attributes to add to the job.
         read_length_for_optimization:  Read length used for optimization only. If this is
             too small CollectWgsMetrics might fail, but the results are not affected
             by this number. [Default: 151] [default: 100000 (from wdl)].
@@ -179,6 +183,7 @@ def extract_coverage_mean(
         metrics: CollectWgsMetrics metrics output to process.
         mean_path: Output path for mean file.
         median_path: Output path for median file.
+        job_attrs: dictionary of attributes to add to the job
 
     Outputs:
         job.mean_coverage: mean coverage of chrM
@@ -268,11 +273,10 @@ def merge_coverage(
     Merge per base coverage files from non-control region and shifted control region.
 
     Args:
-        non_cr_coverage: Per-base coverage from CollectHsMetrics for all of
-            chrM excluding the control region.
-        shifted_cr_coverage: Per-base coverage from CollectHsMetrics for only the chrM
-            control region in shifted coord space.
+        non_cr_coverage: Per-base coverage from CollectHsMetrics for all of chrM, excluding the control region.
+        shifted_cr_coverage: Per-base coverage from CollectHsMetrics for the chrM control region in shifted coord space.
         merged_coverage: Path to write merged coverage tsv.
+        job_attrs: Dictionary of job attributes to add to the job.
 
     Outputs:
         job.merged_coverage: Merged coverage tsv.
@@ -380,8 +384,7 @@ def liftover_and_combine_vcfs(
     Args:
         vcf: chrM variants mapped to wt chrM (exl control region).
         shifted_vcf: chrM control region variants mapped to shifted chrM.
-        reference: resource group for wt chrM reference.
-        shift_back_chain: chain file provided with shifted genome.
+        job_attrs: dict of all attributes to add to the job.
 
     Outputs:
         job.output_vcf: Merged vcf.gz in standard hg38 coordinate space.
@@ -427,6 +430,7 @@ def merge_mutect_stats(
     Args:
         first_stats_file: Mutect stats ResourceFile
         second_stats_file: Mutect stats ResourceFile
+        job_attrs: dict of all attributes to add to the job.
 
     Outputs:
         combined_stats: Combined stats file
@@ -467,23 +471,23 @@ def filter_variants(
     Args:
         vcf: input vcf
         merged_mutect_stats: Mutect statistics file
-        max_alt_allele_count: Maximum alt alleles per site (VariantFiltration).
+        job_attrs: dict of all attributes to add to the job.
         min_allele_fraction: Hard cutoff for minimum allele fraction. All sites with VAF
             less than this cutoff will be filtered. (VariantFiltration).
         contamination_estimate: Estimated sample contamination level (VariantFiltration).
             This is passed as a single float in a file as it is calculated at an earlier
             step in the pipeline.
-        f_score_beta: F score beta, the relative weight of recall to precision,
-            used if OPTIMAL_F_SCORE strategy is chosen (VariantFiltration). Default: 1.0
-            is default provided by VariantFiltration.
 
     Outputs:
         job.output_vcf: filtered vcf file.
 
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL486-L571C2
-    Note:
-        contamination_estimate pre-calculation has been moved out of this function.
+
+    From config:
+    F score beta, the relative weight of recall to precision,
+            used if OPTIMAL_F_SCORE strategy is chosen (VariantFiltration). Default: 1.0
+            is default provided by VariantFiltration.
     """
     # alt_allele config from
     # https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
@@ -541,8 +545,8 @@ def split_multi_allelics(
 ) -> Job:
     """
     Splits multi allelics and removes non pass sites
-    Uses LeftAlignAndTrimVariants to split then optionally use SelectVariants to select
-    only passing variants.
+    Uses LeftAlignAndTrimVariants to split then optionally use SelectVariants to select only passing variants.
+
     Args:
         vcf: Input vcf file.
         job_attrs: attributes to add to the GCP job
@@ -601,6 +605,7 @@ def get_contamination(
     Args:
         vcf: input vcf of passing variants with multi-allelics split.
         haplocheck_output: Path to write results file.
+        job_attrs: attributes to add to the GCP job
 
     Outputs:
         job.haplocheck_output: ResourceFile containing HaplocheckerCLI tsv report.
@@ -640,8 +645,8 @@ def parse_contamination_results(
         haplocheck_report: native output from haplocheckCLI
         verifybamid_output: [optional] native output from verifyBamID
 
-        Based on logic here:
-        https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL523-L524
+    Based on logic here:
+    https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL523-L524
 
     Output:
         returns contamination level as a PythonResult
