@@ -1,32 +1,24 @@
-# cpg-flow-pipeline-template
-A template repository to use as a base for CPG workflows using the cpg-flow pipeline framework
+# cpg-flow-mito
 
-## Purpose
+A re-implementation of the CPG's RD Mitochondrial Analysis workflow, using cpg-flow. The original CPG-workflows implementation is [here](https://github.com/populationgenomics/production-pipelines/blob/main/cpg_workflows/stages/mito.py)
 
-When migrating workflows from production-pipelines, this template respository structure can be used to start with a
-sensible directory structure, and some suggested conventions for naming and placement of files.
+The production-pipelines version of this workflow was itself a re-implementation of the original Broad workflow,
+originally created in WDL [here](https://github.com/broadinstitute/gatk/blob/330c59a5bcda6a837a545afd2d453361f373fae3/scripts/mitochondria_m2_wdl/MitochondriaPipeline.wdl)
 
-```commandline
+```text
 src
-├── workflow_name
-│   ├── __init__.py
-│   ├── config_template.toml
-│   ├── jobs
-│   │   └── LogicForAStage.py
-│   ├── main.py
-│   ├── stages.py
-│   └── utils.py
+├── __init__.py
+└── cpg_flow_mito
+    ├── __init__.py
+    ├── config_template.toml
+    ├── jobs
+    │   ├── __init__.py
+    │   ├── mito.py
+    │   ├── picard.py
+    │   └── vep.py
+    ├── run_workflow.py
+    ├── scripts
+    │   └── __init__.py
+    ├── stages.py
+    └── utils.py
 ```
-
-`workflow_name` occurs in a number of places ([pyproject.toml](pyproject.toml), [src](src), and the workflow name in the
-template config file). It is intended that you remove this generic placeholder name, and replace it with the name of
-your workflow.
-
-`stages.py` contains Stages in the workflow, with the actual logic imported from files in `jobs`.
-
-`stages.py` also links to the Pipeline Naming Conventions document, containing a number of recommendations for naming
-Stages and other elements of the workflow.
-
-`config_template.toml` is a template, indicating the settings which are mandatory for the pipeline to run. In
-production-pipelines, many of these settings were satisfied by the cpg-workflows or per-workflow default TOML files. If
-a pipeline is being migrated from production-pipelines, the previous default config TOML would be a better substitute.

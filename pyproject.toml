@@ -3,10 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name='cpg-flow-mito'
+name='cpg_flow_mito'
 description='Mitochondrial analysis implemented in CPG-Flow'
 readme = "README.md"
-# currently cpg-flow is pinned to this version
 requires-python = ">=3.10,<3.11"
 version='0.1.0'
 license={ "file" = "LICENSE" }
@@ -21,19 +20,14 @@ classifiers=[
 ]
 
 dependencies=[
-    'cpg-flow>=v0.1.2',
+    'cpg-flow>=v0.3.2',
     'hatchling',
-    'loguru',
 ]
 
 [project.urls]
 Repository = "https://github.com/populationgenomics/cpg-flow-mito.git"
 
 [project.optional-dependencies]
-# various requirements when running cpg-flow/analysis-runner
-cpg = [
-    'cpg-flow>=v0.1.2',
-]
 test = [
     'bump-my-version',
     'pre-commit',
@@ -41,34 +35,19 @@ test = [
 ]
 
 [project.scripts]
-# the workflow runner script - entrypoint for the pipeline
-first_workflow = 'cpg_mito.first_workflow:cli_main'
-full_workflow = 'cpg_mito.full_workflow:cli_main'
+run_workflow = 'cpg_flow_mito.run_workflow:cli_main'
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/cpg_mito"]
+packages = ["src/cpg_flow_mito"]
+
 [tool.hatch.build.targets.wheel.sources]
 "src" = ""
-
 
 [options]
 include_package_data = true
 
 [options.package_data]
-'cpg_mito'=  ['config_template.toml']
-
-[tool.black]
-line-length = 120
-skip-string-normalization = true
-exclude = '''
-/(
-  venv
-  | \.mypy_cache
-  | \.venv
-  | build
-  | dist
-)/
-'''
+'cpg_flow_mito'=  ['config_template.toml']
 
 [tool.mypy]
 ignore_missing_imports = true
@@ -112,16 +91,8 @@ ignore = [
 section-order = ["future", "standard-library", "third-party", "hail", "cpg", "first-party", "local-folder"]
 
 [tool.ruff.lint.isort.sections]
-cpg = ["cpg_seqr_loader", "talos", "cpg-flow", "cpg-utils"]
+cpg = ["cpg_flow_mito", "cpg-flow", "cpg-utils"]
 hail = ["hail"]
-
-
-[tool.ruff.lint.per-file-ignores]
-# suppress the ARG002 "Unused method argument" warning in the stages.py file
-## - we don't need generic cpg-flow arguments for every Stage, but need to fit the required method signature
-"src/cpg_seqr_loader/stages.py" = ["ARG002"]
-"src/cpg_seqr_loader/scripts/mt_to_es.py" = ["ANN202"]
-"src/cpg_seqr_loader/scripts/annotate_cohort.py" = ["E501"]
 
 [tool.bumpversion]
 current_version = "0.1.7"
