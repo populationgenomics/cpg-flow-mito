@@ -327,7 +327,7 @@ def mito_mutect2(
         cram: Cram to call variants in.
         region: Coordinate string restricting the region to call variants within.
         max_reads_per_alignment_start: Mutect argument. [Default: 75].
-        job_attrs
+        job_attrs: Dictionary of job attributes to add to the job.
         shifted: bool, determines which reference group is collected
 
     Output:
