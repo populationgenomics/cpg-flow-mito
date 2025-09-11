@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 
 from cpg_flow.workflow import run_workflow
 
-from cpg_flow_mito.stages import MitoReport
+from cpg_flow_mito.stages import GenerateMitoJointCall, MitoReport
 
 
 def cli_main():
@@ -14,7 +14,7 @@ def cli_main():
     parser = ArgumentParser()
     parser.add_argument('--dry_run', action='store_true', help='Dry run')
     args = parser.parse_args()
-    run_workflow(stages=[MitoReport], dry_run=args.dry_run)
+    run_workflow(stages=[MitoReport, GenerateMitoJointCall], dry_run=args.dry_run)
 
 
 if __name__ == '__main__':

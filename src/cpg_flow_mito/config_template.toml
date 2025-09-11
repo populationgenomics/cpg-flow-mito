@@ -6,8 +6,6 @@
 # it will be once we hit joint-calling/aggregation steps
 name = 'cpg_flow_mito'
 
-input_cohorts = []
-sequencing_type = 'genome'
 
 # used to make sure we don't repeat previously completed stages
 check_expected_outputs = true
@@ -43,6 +41,7 @@ vaf_filter_threshold = 0.01
 max_alt_allele_count = 4
 
 [images]
+bcftools = "australia-southeast1-docker.pkg.dev/cpg-common/images/bcftools:1.22-1"
 bwa = "australia-southeast1-docker.pkg.dev/cpg-common/images/bwa:0.7.17"
 gatk = "australia-southeast1-docker.pkg.dev/cpg-common/images/gatk:4.2.6.1"
 haplocheckcli = "australia-southeast1-docker.pkg.dev/cpg-common/images/haplocheckcli:64293b3481d52025a01a293f6cc891546c30660e"
