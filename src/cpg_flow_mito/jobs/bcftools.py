@@ -43,12 +43,11 @@ def naive_merge_vcfs(
     # step 1, purge the VCFs of any post-splitting previously multiallelic sites
     reduced_vcfs = []
     for index, vcf in enumerate(batch_vcfs):
-        # "bcftools view -H mito_CPG262550.mito.vcf.gz | awk -F'\t' '{split($10, a, ":"); if (gsub("/", "", a[1]) < 2) print}'"
         merge_job.command(f"""
         bcftools view -h {vcf} -Oz -o ${{BATCH_TMPDIR}}/{index}.vcf.bgz
         bcftools view -H {vcf} | awk -F'\t' '{{split($10, a, ":"); if (gsub("/", "", a[1]) < 2) print}}' | bgzip >> ${{BATCH_TMPDIR}}/{index}.vcf.bgz
         bcftools index -t ${{BATCH_TMPDIR}}/{index}.vcf.bgz
-        """)
+        """)  # noqa: E501
         reduced_vcfs.append(f'${{BATCH_TMPDIR}}/{index}.vcf.bgz')
 
     # option breakdown:

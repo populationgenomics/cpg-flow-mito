@@ -396,7 +396,7 @@ class MitoReport(stage.SequencingGroupStage):
 
 @stage.stage(required_stages=[GenotypeMito], analysis_keys=['joint_vcf'], analysis_type='vcf')
 class GenerateMitoJointCall(stage.DatasetStage):
-    def expected_outputs(self, dataset: targets.Dataset, inputs: stage.StageInput) -> dict[str, Path]:  # noqa: ARG002
+    def expected_outputs(self, dataset: targets.Dataset) -> dict[str, Path]:  # noqa: ARG002
         return {
             'joint_vcf': dataset.prefix()
             / workflow.get_workflow().name
