@@ -7,7 +7,7 @@ name='cpg_flow_mito'
 description='Mitochondrial analysis implemented in CPG-Flow'
 readme = "README.md"
 requires-python = ">=3.10,<3.11"
-version='0.1.0'
+version='0.1.1'
 license={ "file" = "LICENSE" }
 classifiers=[
     'Environment :: Console',
@@ -95,7 +95,7 @@ cpg = ["cpg_flow_mito", "cpg-flow", "cpg-utils"]
 hail = ["hail"]
 
 [tool.bumpversion]
-current_version = "0.1.7"
+current_version = "0.1.1"
 parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
 serialize = ["{major}.{minor}.{patch}"]
 commit = true
@@ -104,8 +104,8 @@ commit_args = ""
 
 [[tool.bumpversion.files]]
 filename = "pyproject.toml"
-search = "version=\"{current_version}\""
-replace = "version=\"{new_version}\""
+search = "version='{current_version}'"
+replace = "version='{new_version}'"
 
 [[tool.bumpversion.files]]
 filename = "README.md"

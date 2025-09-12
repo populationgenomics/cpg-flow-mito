@@ -5,10 +5,10 @@ Reimplemented version of;
 https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/MitochondriaPipeline.wdl
 """
 
-from cpg_flow import stage
+from cpg_flow import stage, targets, workflow
 from cpg_utils import Path, config, hail_batch
 
-from cpg_flow_mito.jobs import mito, picard, vep
+from cpg_flow_mito.jobs import bcftools, mito, picard, vep
 
 
 @stage.stage(
@@ -205,7 +205,7 @@ class GenotypeMito(stage.SequencingGroupStage):
             recall and precision. The relative weight of recall to precision."
     """
 
-    def expected_outputs(self, sequencing_group: stage.SequencingGroup) -> dict[str, Path]:
+    def expected_outputs(self, sequencing_group: targets.SequencingGroup) -> dict[str, Path]:
         main = sequencing_group.dataset.prefix()
         analysis = sequencing_group.dataset.analysis_prefix()
         return {
@@ -215,7 +215,7 @@ class GenotypeMito(stage.SequencingGroupStage):
 
     def queue_jobs(
         self,
-        sequencing_group: stage.SequencingGroup,
+        sequencing_group: targets.SequencingGroup,
         inputs: stage.StageInput,
     ) -> stage.StageOutput:
         outputs = self.expected_outputs(sequencing_group)
@@ -355,7 +355,7 @@ class MitoReport(stage.SequencingGroupStage):
     https://github.com/bioinfomethods/mitoreport
     """
 
-    def expected_outputs(self, sequencing_group: stage.SequencingGroup) -> dict[str, Path]:
+    def expected_outputs(self, sequencing_group: targets.SequencingGroup) -> dict[str, Path]:
         main = sequencing_group.dataset.prefix()
         web = sequencing_group.dataset.web_prefix()
         return {
@@ -365,7 +365,7 @@ class MitoReport(stage.SequencingGroupStage):
 
     def queue_jobs(
         self,
-        sequencing_group: stage.SequencingGroup,
+        sequencing_group: targets.SequencingGroup,
         inputs: stage.StageInput,
     ) -> stage.StageOutput:
         outputs = self.expected_outputs(sequencing_group)
@@ -374,7 +374,7 @@ class MitoReport(stage.SequencingGroupStage):
 
         vep_j = vep.vep_one(
             vcf=inputs.as_path(sequencing_group, GenotypeMito, 'out_vcf'),
-            out_path=outputs['vep_vcf'],
+            out_path=str(outputs['vep_vcf']),
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         if vep_j:
@@ -392,3 +392,28 @@ class MitoReport(stage.SequencingGroupStage):
             jobs.append(mitoreport_j)
 
         return self.make_outputs(sequencing_group, data=outputs, jobs=jobs)
+
+
+@stage.stage(required_stages=[GenotypeMito], analysis_keys=['joint_vcf'], analysis_type='vcf')
+class GenerateMitoJointCall(stage.DatasetStage):
+    def expected_outputs(self, dataset: targets.Dataset) -> dict[str, Path]:
+        return {
+            'joint_vcf': dataset.prefix()
+            / workflow.get_workflow().name
+            / dataset.get_alignment_inputs_hash()
+            / self.name
+            / 'merged_mito.vcf.bgz'
+        }
+
+    def queue_jobs(self, dataset: targets.Dataset, inputs: stage.StageInput) -> stage.StageOutput:
+        outputs = self.expected_outputs(dataset)
+
+        input_dict = inputs.as_dict_by_target(GenotypeMito)
+
+        bcftools_job = bcftools.naive_merge_vcfs(
+            input_list=[input_dict[sg.id]['out_vcf'] for sg in dataset.get_sequencing_groups()],
+            job_attrs=self.get_job_attrs(dataset),
+            output_file=str(outputs['joint_vcf']),
+        )
+
+        return self.make_outputs(dataset, data=outputs, jobs=bcftools_job)
