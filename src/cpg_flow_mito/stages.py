@@ -400,7 +400,7 @@ class GenerateMitoJointCall(stage.DatasetStage):
         return {
             'joint_vcf': dataset.prefix()
             / workflow.get_workflow().name
-            / dataset.alignment_inputs_hash
+            / dataset.get_alignment_inputs_hash()
             / self.name
             / 'merged_mito.vcf.bgz'
         }
