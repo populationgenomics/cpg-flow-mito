@@ -411,8 +411,9 @@ class GenerateMitoJointCall(stage.DatasetStage):
         input_dict = inputs.as_dict_by_target(GenotypeMito)
 
         bcftools_job = bcftools.naive_merge_vcfs(
-            input_list=[input_dict[sg.id] for sg in dataset.get_sequencing_groups()],
+            input_list=[input_dict[sg.id]['out_vcf'] for sg in dataset.get_sequencing_groups()],
             job_attrs=self.get_job_attrs(dataset),
+            output_file=str(outputs['joint_vcf']),
         )
 
         return self.make_outputs(dataset, data=outputs, jobs=bcftools_job)
