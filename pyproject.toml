@@ -7,7 +7,7 @@ name='cpg_flow_mito'
 description='Mitochondrial analysis implemented in CPG-Flow'
 readme = "README.md"
 requires-python = ">=3.10,<3.11"
-version='0.1.1'
+version='0.1.2'
 license={ "file" = "LICENSE" }
 classifiers=[
     'Environment :: Console',
@@ -106,11 +106,6 @@ commit_args = ""
 filename = "pyproject.toml"
 search = "version='{current_version}'"
 replace = "version='{new_version}'"
-
-[[tool.bumpversion.files]]
-filename = "README.md"
-search = "{current_version}"
-replace = "{new_version}"
 
 [[tool.bumpversion.files]]
 filename = ".github/workflows/docker.yaml"
