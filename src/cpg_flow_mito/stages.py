@@ -417,3 +417,26 @@ class GenerateMitoJointCall(stage.DatasetStage):
         )
 
         return self.make_outputs(dataset, data=outputs, jobs=bcftools_job)
+
+
+@stage.stage(required_stages=[GenerateMitoJointCall], analysis_keys=['joint_vcf'], analysis_type='vcf')
+class AnnotateMitoJointCall(stage.DatasetStage):
+    def expected_outputs(self, dataset: targets.Dataset) -> dict[str, Path]:
+        return {
+            'annotated_vcf': dataset.prefix()
+            / workflow.get_workflow().name
+            / dataset.get_alignment_inputs_hash()
+            / self.name
+            / 'annotated_mito.vcf.bgz'
+        }
+
+    def queue_jobs(self, dataset: targets.Dataset, inputs: stage.StageInput) -> stage.StageOutput:
+        outputs = self.expected_outputs(dataset)
+
+        vep_j = vep.vep_one(
+            vcf=inputs.as_path(dataset, GenerateMitoJointCall, 'joint_vcf'),
+            out_path=str(outputs['annotated_vcf']),
+            job_attrs=self.get_job_attrs(dataset),
+        )
+
+        return self.make_outputs(dataset, data=outputs, jobs=vep_j)
