@@ -6,7 +6,6 @@
 # it will be once we hit joint-calling/aggregation steps
 name = 'cpg_flow_mito'
 
-
 # used to make sure we don't repeat previously completed stages
 check_expected_outputs = true
 

@@ -20,7 +20,7 @@ classifiers=[
 ]
 
 dependencies=[
-    'cpg-flow>=v0.3.2',
+    'cpg-flow>=v0.4.0',
     'hatchling',
 ]
 
@@ -95,7 +95,7 @@ cpg = ["cpg_flow_mito", "cpg-flow", "cpg-utils"]
 hail = ["hail"]
 
 [tool.bumpversion]
-current_version = "0.1.1"
+current_version = "0.1.2"
 parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
 serialize = ["{major}.{minor}.{patch}"]
 commit = true

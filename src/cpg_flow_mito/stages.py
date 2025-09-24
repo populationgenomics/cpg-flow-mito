@@ -419,7 +419,7 @@ class GenerateMitoJointCall(stage.DatasetStage):
         return self.make_outputs(dataset, data=outputs, jobs=bcftools_job)
 
 
-@stage.stage(required_stages=[GenerateMitoJointCall], analysis_keys=['joint_vcf'], analysis_type='vcf')
+@stage.stage(required_stages=[GenerateMitoJointCall], analysis_keys=['annotated_vcf'], analysis_type='vcf')
 class AnnotateMitoJointCall(stage.DatasetStage):
     def expected_outputs(self, dataset: targets.Dataset) -> dict[str, Path]:
         return {
