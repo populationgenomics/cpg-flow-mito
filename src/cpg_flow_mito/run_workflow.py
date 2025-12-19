@@ -14,7 +14,7 @@ def cli_main():
     parser = ArgumentParser()
     parser.add_argument('--dry_run', action='store_true', help='Dry run')
     args = parser.parse_args()
-    run_workflow(stages=[MitoReport, AnnotateMitoJointCall], dry_run=args.dry_run)
+    run_workflow(name='mito', stages=[MitoReport, AnnotateMitoJointCall], dry_run=args.dry_run)
 
 
 if __name__ == '__main__':
