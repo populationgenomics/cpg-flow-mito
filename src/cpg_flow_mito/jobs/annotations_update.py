@@ -14,7 +14,7 @@ def download_latest_annotations(output_path: Path, job_attrs: dict[str, str]):
     until [ "$n" -ge 5 ]
     do
        java -jar mitoreport.jar mito-map-download --output {job.output} && break
-       n=$((n+1)) 
+       n=$((n+1))
        sleep 20
     done
     """)
