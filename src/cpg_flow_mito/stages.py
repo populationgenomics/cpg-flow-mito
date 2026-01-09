@@ -5,8 +5,6 @@ Reimplemented version of;
 https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/MitochondriaPipeline.wdl
 """
 
-
-
 import zoneinfo
 from datetime import datetime
 from functools import cache
@@ -16,8 +14,7 @@ from cpg_flow.stage import StageInput, StageOutput
 from cpg_flow.targets import MultiCohort
 from cpg_utils import Path, config, hail_batch, to_path
 
-from cpg_flow_mito.jobs import bcftools, mito, picard, vep, annotations_update
-
+from cpg_flow_mito.jobs import annotations_update, bcftools, mito, picard, vep
 
 
 @cache
@@ -33,10 +30,8 @@ def get_path_to_mito_ref_data():
 class DownloadMitoMapData(stage.MultiCohortStage):
     """A once-monthly download of the data required in Mitomap."""
 
-    def expected_outputs(self, _multicohort: MultiCohort) -> dict[str,Path]:
-        return {
-            'annotations': get_path_to_mito_ref_data()
-        }
+    def expected_outputs(self, _multicohort: MultiCohort) -> dict[str, Path]:
+        return {'annotations': get_path_to_mito_ref_data()}
 
     def queue_jobs(
         self,
@@ -44,8 +39,12 @@ class DownloadMitoMapData(stage.MultiCohortStage):
         _inputs: StageInput,
     ) -> StageOutput:
         output = self.expected_outputs(multicohort)
-        job = annotations_update.download_latest_annotations(output['annotations'], job_attrs=self.get_job_attrs(multicohort),)
+        job = annotations_update.download_latest_annotations(
+            output['annotations'],
+            job_attrs=self.get_job_attrs(multicohort),
+        )
         return self.make_outputs(multicohort, output, jobs=job)
+
 
 @stage.stage(
     analysis_type='mito-cram',

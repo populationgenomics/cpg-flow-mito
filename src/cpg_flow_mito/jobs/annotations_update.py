@@ -1,5 +1,5 @@
+from cpg_utils import Path, config, hail_batch
 
-from cpg_utils import Path, hail_batch, config
 
 def download_latest_annotations(output_path: Path, job_attrs: dict[str, str]):
     """Trigger the MitoMap download, save to GCP."""
