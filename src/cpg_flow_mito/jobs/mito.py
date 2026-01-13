@@ -717,6 +717,7 @@ def mitoreport(
     vcf_path: Path,
     cram_path: Path,
     output_path: Path,
+    annotations: Path,
     job_attrs: dict,
 ) -> Job:
     """
@@ -730,6 +731,7 @@ def mitoreport(
     res = resources.STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)
 
+    localised_annotations = batch_instance.read_input(annotations)
     vcf = batch_instance.read_input_group(**{'vcf.gz': str(vcf_path)})
     cram = batch_instance.read_input_group(
         **{
@@ -746,7 +748,7 @@ def mitoreport(
 
         java -jar mitoreport.jar mito-report \
             -sample {sequencing_group.id} \
-            -mann resources/mito_map_annotations.json \
+            -mann {localised_annotations} \
             -gnomad resources/gnomad.genomes.v3.1.sites.chrM.vcf.bgz \
             -vcf {vcf['vcf.gz']} \
             {sequencing_group.id}.bam ./resources/controls/*.bam

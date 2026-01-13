@@ -5,10 +5,45 @@ Reimplemented version of;
 https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/MitochondriaPipeline.wdl
 """
 
-from cpg_flow import stage, targets, workflow
-from cpg_utils import Path, config, hail_batch
+import zoneinfo
+from datetime import datetime
+from functools import cache
 
-from cpg_flow_mito.jobs import bcftools, mito, picard, vep
+from cpg_flow import stage, targets, workflow
+from cpg_flow.stage import StageInput, StageOutput
+from cpg_flow.targets import MultiCohort
+from cpg_utils import Path, config, hail_batch, to_path
+
+from cpg_flow_mito.jobs import annotations_update, bcftools, mito, picard, vep
+
+
+@cache
+def get_path_to_mito_ref_data():
+    """Build a path to the expected MitoMap annotations."""
+    tz = zoneinfo.ZoneInfo('Australia/Brisbane')
+    this_month_as_string = datetime.now(tz=tz).strftime('%Y-%m')
+    common_default = config.config_retrieve(['storage', 'common', 'default'])
+    return to_path(common_default) / 'mitoreport_ref' / this_month_as_string / 'mito_map_annotations.json'
+
+
+@stage.stage
+class DownloadMitoMapData(stage.MultiCohortStage):
+    """A once-monthly download of the data required in Mitomap."""
+
+    def expected_outputs(self, _multicohort: MultiCohort) -> dict[str, Path]:
+        return {'annotations': get_path_to_mito_ref_data()}
+
+    def queue_jobs(
+        self,
+        multicohort: MultiCohort,
+        _inputs: StageInput,
+    ) -> StageOutput:
+        output = self.expected_outputs(multicohort)
+        job = annotations_update.download_latest_annotations(
+            output['annotations'],
+            job_attrs=self.get_job_attrs(multicohort),
+        )
+        return self.make_outputs(multicohort, output, jobs=job)
 
 
 @stage.stage(
@@ -339,7 +374,7 @@ class GenotypeMito(stage.SequencingGroupStage):
 
 
 @stage.stage(
-    required_stages=[RealignMito, GenotypeMito],
+    required_stages=[DownloadMitoMapData, RealignMito, GenotypeMito],
     analysis_type='web',
     analysis_keys=['mitoreport'],
 )
@@ -370,6 +405,9 @@ class MitoReport(stage.SequencingGroupStage):
     ) -> stage.StageOutput:
         outputs = self.expected_outputs(sequencing_group)
 
+        multicohort = workflow.get_multicohort()
+        mitomap_annotations = inputs.as_path(multicohort, DownloadMitoMapData, 'annotations')
+
         jobs = []
 
         vep_j = vep.vep_one(
@@ -385,6 +423,7 @@ class MitoReport(stage.SequencingGroupStage):
             vcf_path=outputs['vep_vcf'],
             cram_path=inputs.as_path(sequencing_group, RealignMito, 'non_shifted_cram'),
             output_path=outputs['mitoreport'],
+            annotations=mitomap_annotations,
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         if mitoreport_j:
