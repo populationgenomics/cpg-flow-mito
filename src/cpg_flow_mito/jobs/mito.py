@@ -698,6 +698,20 @@ def parse_contamination_results(
     return j, contamination_level
 
 
+def update_default_heteroplasmy_filter(sequencing_group_id):
+    """Update default heteroplasmy filters using sed commands"""
+    js_file = f'mitoreport-{sequencing_group_id}/js/app.aa325a53.js'
+    map_file = f'mitoreport-{sequencing_group_id}/js/app.aa325a53.js.map'
+
+    # Use sed to replace the vafRange values in both files
+    sed_commands = f"""
+    sed -i 's/vafRange:\[\.02,1\]/vafRange:[.1,1]/g' "{js_file}"
+    sed -i 's/vafRange: \[0\.02, 1\]/vafRange: [0.1, 1]/g' "{map_file}"
+    """  # noqa: W605
+
+    return sed_commands.strip()
+
+
 def mitoreport(
     sequencing_group: targets.SequencingGroup,
     vcf_path: Path,
@@ -738,7 +752,16 @@ def mitoreport(
             -gnomad resources/gnomad.genomes.v3.1.sites.chrM.vcf.bgz \
             -vcf {vcf['vcf.gz']} \
             {sequencing_group.id}.bam ./resources/controls/*.bam
+        """
+    )
 
+    # Update the default heteroplasmy filters
+    sed_commands = update_default_heteroplasmy_filter(sequencing_group.id)
+    j.command(sed_commands)
+
+    # Write the whole report folder to GCP
+    j.command(
+        f"""
         gcloud storage cp -r 'mitoreport-{sequencing_group.id}/*' {output_path.parent}
         """
     )

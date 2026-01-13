@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 
 DATE_STRING: str = datetime.now().strftime('%y-%m')  # noqa: DTZ005
 
-
 @cache
 def get_mito_references(shifted: bool = False) -> 'ResourceGroup':
     """
