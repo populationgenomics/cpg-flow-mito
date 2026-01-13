@@ -13,9 +13,6 @@ if TYPE_CHECKING:
 
 DATE_STRING: str = datetime.now().strftime('%y-%m')  # noqa: DTZ005
 
-JS_FILE = 'js/app.aa325a53.js'
-MAP_FILE = 'js/app.aa325a53.js.map'
-
 @cache
 def get_mito_references(shifted: bool = False) -> 'ResourceGroup':
     """

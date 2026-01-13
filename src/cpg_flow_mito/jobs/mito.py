@@ -10,7 +10,7 @@ from cpg_utils import Path, config, hail_batch, to_path
 from hailtop.batch.job import Job
 from hailtop.batch.resource import PythonResult
 
-from cpg_flow_mito.utils import JS_FILE, MAP_FILE, get_control_region_intervals, get_mito_references
+from cpg_flow_mito.utils import get_control_region_intervals, get_mito_references
 
 
 def subset_cram_to_chrm(
@@ -699,25 +699,17 @@ def parse_contamination_results(
 
 
 def update_default_heteroplasmy_filter(sequencing_group_id):
-    for file_path in [f'mitoreport-{sequencing_group_id}/{JS_FILE}', f'mitoreport-{sequencing_group_id}/{MAP_FILE}']:
-        # Modify the default Heteroplasmy filters
-        if file_path.endswith(JS_FILE):
-            original = 'vafRange:[.02,1]'
-            replacement = 'vafRange:[.1,1]'
-        elif file_path.endswith(MAP_FILE):
-            original = 'vafRange: [0.02, 1]'
-            replacement = 'vafRange: [0.1, 1]'
+    """Update default heteroplasmy filters using sed commands"""
+    js_file = f'mitoreport-{sequencing_group_id}/js/app.aa325a53.js'
+    map_file = f'mitoreport-{sequencing_group_id}/js/app.aa325a53.js.map'
 
-        # Read the content
-        with open(file_path, encoding='utf-8') as f:
-            content = f.read()
+    # Use sed to replace the vafRange values in both files
+    sed_commands = f"""
+    sed -i 's/vafRange:\[\.02,1\]/vafRange:[.1,1]/g' "{js_file}"
+    sed -i 's/vafRange: \[0\.02, 1\]/vafRange: [0.1, 1]/g' "{map_file}"
+    """  # noqa: W605
 
-        # Perform replacements
-        new_content = content.replace(original, replacement)
-
-        # Write updated content
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(new_content)
+    return sed_commands.strip()
 
 
 def mitoreport(
@@ -762,7 +754,8 @@ def mitoreport(
     )
 
     # Update the default heteroplasmy filters
-    update_default_heteroplasmy_filter(sequencing_group.id)
+    sed_commands = update_default_heteroplasmy_filter(sequencing_group.id)
+    j.command(sed_commands)
 
     # Write the whole report folder to GCP
     j.command(
