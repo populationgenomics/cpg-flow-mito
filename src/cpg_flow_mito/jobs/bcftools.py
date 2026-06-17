@@ -9,7 +9,6 @@ from hailtop.batch.job import BashJob
 def naive_merge_vcfs(
     input_list: list[str | Path],
     output_file: str,
-    cpu: int = 4,
     memory: str = '16Gi',
     storage: str = '50Gi',
     job_attrs: dict[str, str] | None = None,
@@ -21,7 +20,6 @@ def naive_merge_vcfs(
     Args:
         input_list (list[str]): all VCFs to merge, can be pre-localised (see vcfs_localised[bool)
         output_file (str): path to a vcf.bgz file to write to
-        cpu (int): number of cores (threads when merging)
         memory (str): RAM requirement
         storage (str): storage requirement for the task
         job_attrs (dict[str, str]): attributes to pass to the job
@@ -35,7 +33,6 @@ def naive_merge_vcfs(
     merge_job.image(config.config_retrieve(['images', 'bcftools']))
 
     # guessing at resource requirements
-    merge_job.cpu(cpu)
     merge_job.memory(memory)
     merge_job.storage(storage)
     merge_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
@@ -44,9 +41,9 @@ def naive_merge_vcfs(
     reduced_vcfs = []
     for index, vcf in enumerate(batch_vcfs):
         merge_job.command(f"""
-        bcftools view -h {vcf} -Oz -o ${{BATCH_TMPDIR}}/{index}.vcf.bgz
-        bcftools view -H {vcf} | awk -F'\t' '{{split($10, a, ":"); if (gsub("/", "", a[1]) < 2) print}}' | bgzip >> ${{BATCH_TMPDIR}}/{index}.vcf.bgz
-        bcftools index -t ${{BATCH_TMPDIR}}/{index}.vcf.bgz
+        bcftools view --no-version -h {vcf} -Oz -o ${{BATCH_TMPDIR}}/{index}.vcf.bgz
+        bcftools view --no-version -H {vcf} | awk -F'\t' '{{split($10, a, ":"); if (gsub("/", "", a[1]) < 2) print}}' | bgzip >> ${{BATCH_TMPDIR}}/{index}.vcf.bgz
+        bcftools index --no-version -t ${{BATCH_TMPDIR}}/{index}.vcf.bgz
         """)  # noqa: E501
         reduced_vcfs.append(f'${{BATCH_TMPDIR}}/{index}.vcf.bgz')
 
@@ -57,7 +54,7 @@ def naive_merge_vcfs(
     # -m: merge strategy
     # -0: missing-calls-to-ref, not important for inheritance checking, but useful for AC/AN/AF accuracy
     merge_job.command(
-        f'bcftools merge {" ".join(reduced_vcfs)} -Oz -o {merge_job.output["vcf.bgz"]} --threads {cpu} -0 -W=tbi',
+        f'bcftools merge --no-version {" ".join(reduced_vcfs)} -Oz -o {merge_job.output["vcf.bgz"]} -0 -W=tbi',
     )
 
     # write the result out
