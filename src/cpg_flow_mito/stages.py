@@ -14,7 +14,7 @@ from cpg_flow.stage import StageInput, StageOutput
 from cpg_flow.targets import MultiCohort
 from cpg_utils import Path, config, hail_batch, to_path
 
-from cpg_flow_mito.jobs import annotations_update, bcftools, mito, picard, vep
+from cpg_flow_mito.jobs import annotations_update, bcftools, build_index, mito, picard, vep
 
 
 @cache
@@ -479,3 +479,17 @@ class AnnotateMitoJointCall(stage.DatasetStage):
         )
 
         return self.make_outputs(dataset, data=outputs, jobs=vep_j)
+
+
+@stage.stage(required_stages=[MitoReport], analysis_keys=['html'], analysis_type='web', forced=True)
+class CreateIndexPage(stage.DatasetStage):
+    def expected_outputs(self, dataset: targets.Dataset) -> dict[str, Path]:
+        web_bucket = dataset.web_prefix() / 'mitoreport'
+        seq_type = config.config_retrieve(['workflow', 'sequencing_type'])
+        index_name = 'exome_index.html' if seq_type == 'exome' else 'genome_index.html'
+        return {'html': web_bucket / index_name}
+
+    def queue_jobs(self, dataset: targets.Dataset, _inputs: stage.StageInput) -> stage.StageOutput:
+        output = self.expected_outputs(dataset)
+        job = build_index.create_index_job(dataset=dataset.name, output=output['html'])
+        return self.make_outputs(dataset, data=output, jobs=job)
