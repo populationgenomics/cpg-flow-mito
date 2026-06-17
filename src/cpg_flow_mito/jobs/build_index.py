@@ -1,7 +1,3 @@
-"""
-wrapper method to generate a VNtyper index generation job
-"""
-
 from cpg_utils import Path, config, hail_batch
 from hailtop.batch.job import BashJob
 
