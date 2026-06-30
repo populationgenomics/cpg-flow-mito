@@ -3,7 +3,7 @@ This script is set to run at the end of the Mito workflow.
 
 It queries Metamist for all analysis entries representing MitoReport results, reduces those down to 1/sequencing group
 
-This will run scoped by dataset and sequencing_type.
+This will run scoped by dataset.
 """
 
 from argparse import ArgumentParser
@@ -36,13 +36,12 @@ WEB_BASE: str = 'gs://cpg-{}-main-web'
 WEB_URL_BASE: str = 'https://main-web.populationgenomics.org.au/{}'
 
 
-def query_for_reports(dataset: str, sequencing_type: str) -> dict[str, dict[str, str]]:
+def query_for_reports(dataset: str) -> dict[str, dict[str, str]]:
     """
     Execute a GQL query for all relevant MitoReport HTMLs. Minimise to one-per-SGID.
 
     Args:
         dataset: str, the name of the dataset/project
-        sequencing_type: str, the type of assay (typically exome/genome)
 
     Returns:
         dict of SGID: Report
@@ -57,7 +56,6 @@ def query_for_reports(dataset: str, sequencing_type: str) -> dict[str, dict[str,
         variables={
             'project': f'{dataset}-test' if access_level == 'test' else dataset,
             'metaFilter': {
-                'sequencing_type': sequencing_type,
                 'stage': 'MitoReport',
             },
         },
@@ -91,11 +89,10 @@ def query_for_reports(dataset: str, sequencing_type: str) -> dict[str, dict[str,
 
 
 def main(dataset: str, output: str) -> None:
-    sequencing_type = config.config_retrieve(['workflow', 'sequencing_type'])
 
     template_context = {
-        'title': f'MitoReport index for {dataset}, {sequencing_type}',
-        'reports': query_for_reports(dataset, sequencing_type),
+        'title': f'MitoReport index for {dataset}',
+        'reports': query_for_reports(dataset),
     }
 
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(JINJA_TEMPLATE_DIR), autoescape=True)

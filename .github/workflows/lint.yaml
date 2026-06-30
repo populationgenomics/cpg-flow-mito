@@ -23,7 +23,7 @@ jobs:
         cache-dependency-path: pyproject.toml
 
     - name: Install packages
-      run: pip install .[test]
+      run: pip install .[dev]
 
     - name: Install pre-commit hooks
       run: pre-commit install --install-hooks
