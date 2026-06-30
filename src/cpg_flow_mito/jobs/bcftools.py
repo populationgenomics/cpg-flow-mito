@@ -32,7 +32,7 @@ def naive_merge_vcfs(
     merge_job = batch_instance.new_job('Merge VCFs', attributes=job_attrs or {} | {'tool': 'bcftools'})
     merge_job.image(config.config_retrieve(['images', 'bcftools']))
 
-    # guessing at resource requirements
+    # guessing resource requirements
     merge_job.memory(memory)
     merge_job.storage(storage)
     merge_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
