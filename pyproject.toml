@@ -28,7 +28,7 @@ dependencies=[
 Repository = "https://github.com/populationgenomics/cpg-flow-mito.git"
 
 [project.optional-dependencies]
-test = [
+dev = [
     'bump-my-version',
     'pre-commit',
     'pytest',
