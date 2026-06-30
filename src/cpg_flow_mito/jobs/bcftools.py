@@ -53,6 +53,7 @@ def naive_merge_vcfs(
     # --threads: number of threads to use
     # -m: merge strategy
     # -0: missing-calls-to-ref, not important for inheritance checking, but useful for AC/AN/AF accuracy
+    # --no-version: doesn't append the command to the VCF header
     merge_job.command(
         f'bcftools merge --no-version {" ".join(reduced_vcfs)} -Oz -o {merge_job.output["vcf.bgz"]} -0 -W=tbi',
     )
