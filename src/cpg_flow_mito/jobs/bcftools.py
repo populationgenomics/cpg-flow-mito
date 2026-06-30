@@ -43,7 +43,7 @@ def naive_merge_vcfs(
         merge_job.command(f"""
         bcftools view --no-version -h {vcf} -Oz -o ${{BATCH_TMPDIR}}/{index}.vcf.bgz
         bcftools view --no-version -H {vcf} | awk -F'\t' '{{split($10, a, ":"); if (gsub("/", "", a[1]) < 2) print}}' | bgzip >> ${{BATCH_TMPDIR}}/{index}.vcf.bgz
-        bcftools index --no-version -t ${{BATCH_TMPDIR}}/{index}.vcf.bgz
+        bcftools index -t ${{BATCH_TMPDIR}}/{index}.vcf.bgz
         """)  # noqa: E501
         reduced_vcfs.append(f'${{BATCH_TMPDIR}}/{index}.vcf.bgz')
 
