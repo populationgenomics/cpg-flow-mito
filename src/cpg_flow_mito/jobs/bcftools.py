@@ -32,7 +32,7 @@ def naive_merge_vcfs(
     merge_job = batch_instance.new_job('Merge VCFs', attributes=job_attrs or {} | {'tool': 'bcftools'})
     merge_job.image(config.config_retrieve(['images', 'bcftools']))
 
-    # guessing at resource requirements
+    # guessing resource requirements
     merge_job.memory(memory)
     merge_job.storage(storage)
     merge_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
@@ -43,7 +43,7 @@ def naive_merge_vcfs(
         merge_job.command(f"""
         bcftools view --no-version -h {vcf} -Oz -o ${{BATCH_TMPDIR}}/{index}.vcf.bgz
         bcftools view --no-version -H {vcf} | awk -F'\t' '{{split($10, a, ":"); if (gsub("/", "", a[1]) < 2) print}}' | bgzip >> ${{BATCH_TMPDIR}}/{index}.vcf.bgz
-        bcftools index --no-version -t ${{BATCH_TMPDIR}}/{index}.vcf.bgz
+        bcftools index -t ${{BATCH_TMPDIR}}/{index}.vcf.bgz
         """)  # noqa: E501
         reduced_vcfs.append(f'${{BATCH_TMPDIR}}/{index}.vcf.bgz')
 
@@ -53,6 +53,7 @@ def naive_merge_vcfs(
     # --threads: number of threads to use
     # -m: merge strategy
     # -0: missing-calls-to-ref, not important for inheritance checking, but useful for AC/AN/AF accuracy
+    # --no-version: doesn't append the command to the VCF header
     merge_job.command(
         f'bcftools merge --no-version {" ".join(reduced_vcfs)} -Oz -o {merge_job.output["vcf.bgz"]} -0 -W=tbi',
     )
