@@ -2,11 +2,18 @@
 # demonstrating some of the common options used in cpg-flow
 [workflow]
 
+sequencing_type = "genome"
+
+only_stages = ['CreateIndexPage']
+
 # the method to register outputs, can be missing - will not generate metamist analysis entries
 status_reporter = 'metamist'
 
 # Use verifybamid in addition to haplocheck for contamination estimate
 use_verifybamid = true
+
+# set to True to prevent pipeline failure when VCFs contain exclusively filtered/blacklisted variants
+allow_no_contamination = false
 
 [references]
 dict = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.dict"
@@ -33,7 +40,7 @@ vaf_filter_threshold = 0.01
 max_alt_allele_count = 4
 
 [images]
-bcftools = "australia-southeast1-docker.pkg.dev/cpg-common/images/bcftools:1.22-1"
+bcftools = "australia-southeast1-docker.pkg.dev/cpg-common/images/bcftools:1.23-1"
 bwa = "australia-southeast1-docker.pkg.dev/cpg-common/images/bwa:0.7.17"
 gatk = "australia-southeast1-docker.pkg.dev/cpg-common/images/gatk:4.2.6.1"
 haplocheckcli = "australia-southeast1-docker.pkg.dev/cpg-common/images/haplocheckcli:64293b3481d52025a01a293f6cc891546c30660e"

@@ -345,6 +345,7 @@ class GenotypeMito(stage.SequencingGroupStage):
             haplocheck_output=get_contamination_j.haplocheck_output,
             verifybamid_output=verifybamid_output,
             job_attrs=self.get_job_attrs(sequencing_group),
+            allow_no_contamination=config.config_retrieve(['workflow', 'allow_no_contamination'], False),
         )
         jobs.append(parse_contamination_j)
 

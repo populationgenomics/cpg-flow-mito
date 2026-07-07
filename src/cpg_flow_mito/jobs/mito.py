@@ -635,6 +635,7 @@ def get_contamination(
 def parse_contamination_results(
     haplocheck_output: hb.ResourceFile | hb.Resource,
     verifybamid_output: hb.ResourceFile | hb.Resource | None,
+    allow_no_contamination: bool,
     job_attrs: dict,
 ) -> tuple[Job, PythonResult]:
     """
@@ -660,7 +661,7 @@ def parse_contamination_results(
     def parse_contamination_worker(
         haplocheck_report: str,
         verifybamid_report: str,
-    ) -> float:
+    ) -> float | None:
         """
         Process haplocheckCLI and verifyBamID outputs to get contamination level as a single float.
         """
@@ -671,6 +672,10 @@ def parse_contamination_results(
                 cleaned_lines.append([x.strip('"') for x in line.strip().split('\t')])
         # sanity check and reformat
         if len(cleaned_lines) != 2 or len(cleaned_lines[0]) != 17:
+            if allow_no_contamination:
+                print('No contamination report found, returning None')
+                return None
+
             raise ValueError(f'Haplocheck report is unexpected format: {cleaned_lines}')
 
         report = dict(zip(cleaned_lines[0], cleaned_lines[1], strict=False))
