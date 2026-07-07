@@ -8,7 +8,6 @@ import hailtop.batch as hb
 from cpg_flow import filetypes, resources, targets
 from cpg_utils import Path, config, hail_batch, to_path
 from hailtop.batch.job import Job
-from hailtop.batch.resource import PythonResult
 
 from cpg_flow_mito.utils import get_control_region_intervals, get_mito_references
 
@@ -636,7 +635,7 @@ def parse_contamination_results(
     haplocheck_output: hb.ResourceFile | hb.Resource,
     verifybamid_output: hb.ResourceFile | hb.Resource | None,
     job_attrs: dict,
-) -> tuple[Job, PythonResult]:
+) -> tuple[Job, hb.ResourceFile]:
     """
     Post process halpocheck and (optionally) verifybamid reports to determine single value
     for estimated contamination that can be used for variant filtering.
@@ -695,7 +694,7 @@ def parse_contamination_results(
     # Call parse_contamination_worker as pythonJob which returns contamination_level as a hail PythonResult.
     contamination_level = j.call(parse_contamination_worker, haplocheck_output, verifybamid_output)
 
-    return j, contamination_level
+    return j, contamination_level.as_str()
 
 
 def update_default_heteroplasmy_filter(sequencing_group_id):

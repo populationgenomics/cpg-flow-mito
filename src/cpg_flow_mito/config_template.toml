@@ -8,6 +8,15 @@ status_reporter = 'metamist'
 # Use verifybamid in addition to haplocheck for contamination estimate
 use_verifybamid = true
 
+# set to True to skip all contamination checks
+# ideal workflow - run with this set to False, all VCFs containing unfiltered variants will succeed
+# if samples failed the main workflow, re-run with this set to True. Final VCFs will be generated without contamination
+# these samples will only fail if the VCF is exclusively poor-quality or blacklisted variants, so this is essential to
+# recover failed samples
+# the only alternative being complete removal from input cohorts, meaning we need to be mindful not to accidentally
+# re-include them in future cohorts else we'll hit the same issue
+skip_contamination = false
+
 [references]
 dict = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.dict"
 fasta = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta"
