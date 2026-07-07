@@ -635,7 +635,7 @@ def parse_contamination_results(
     haplocheck_output: hb.ResourceFile | hb.Resource,
     verifybamid_output: hb.ResourceFile | hb.Resource | None,
     job_attrs: dict,
-) -> tuple[Job | None, hb.ResourceFile]:
+) -> tuple[Job, hb.ResourceFile]:
     """
     Post process halpocheck and (optionally) verifybamid reports to determine single value
     for estimated contamination that can be used for variant filtering.
