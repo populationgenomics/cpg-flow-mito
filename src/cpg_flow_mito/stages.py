@@ -326,7 +326,7 @@ class GenotypeMito(stage.SequencingGroupStage):
         # allow the contamination loop to be skipped entirely, where we know VCFs are empty
         # VCF containing only filtered variants -> filter removes all variants -> no data for contamination est. -> fail
         if config.config_retrieve(['workflow', 'skip_contamination'], False):
-            parse_contamination_j, contamination_level = None, None
+            contamination_level = None
 
         else:
             # SplitMultiAllelics AND remove non-passing sites
