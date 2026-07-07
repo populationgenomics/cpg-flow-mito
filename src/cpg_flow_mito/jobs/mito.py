@@ -8,7 +8,6 @@ import hailtop.batch as hb
 from cpg_flow import filetypes, resources, targets
 from cpg_utils import Path, config, hail_batch, to_path
 from hailtop.batch.job import Job
-from hailtop.batch.resource import PythonResult
 
 from cpg_flow_mito.utils import get_control_region_intervals, get_mito_references
 
