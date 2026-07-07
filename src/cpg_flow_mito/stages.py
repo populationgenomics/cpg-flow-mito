@@ -230,7 +230,7 @@ class GenotypeMito(stage.SequencingGroupStage):
     Outputs:
         out_vcf: the final filtered vcf for downstream use
         haplocheck_metrics: Metrics generated from the haplocheckCLI tool including an
-            estimate of contamination and the predicted mitochondrial haplotype found.
+            estimate of contamination and the predicted mitochondrial haplotype found (optional).
 
     Configuration options:
         The following are surfaced as configurable parameters in the Broad WDL. Other
@@ -241,11 +241,12 @@ class GenotypeMito(stage.SequencingGroupStage):
     """
 
     def expected_outputs(self, sequencing_group: targets.SequencingGroup) -> dict[str, Path]:
+        # haplocheck_metrics is a str, as it's never generated if contamination is skipped
         main = sequencing_group.dataset.prefix()
         analysis = sequencing_group.dataset.analysis_prefix()
         return {
             'out_vcf': main / 'mito' / f'{sequencing_group.id}.mito.vcf.bgz',
-            'haplocheck_metrics': analysis / 'mito' / f'{sequencing_group.id}.haplocheck.txt',
+            'haplocheck_metrics': str(analysis / 'mito' / f'{sequencing_group.id}.haplocheck.txt'),
         }
 
     def queue_jobs(
