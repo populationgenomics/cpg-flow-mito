@@ -323,36 +323,42 @@ class GenotypeMito(stage.SequencingGroupStage):
         )
         jobs.append(initial_filter_j)
 
-        # SplitMultiAllelics AND remove non-passing sites
-        # Output is only used for input to haplocheck
-        split_multiallelics_j = mito.split_multi_allelics(
-            vcf=initial_filter_j.output_vcf,
-            remove_non_pass_sites=True,
-            job_attrs=self.get_job_attrs(sequencing_group),
-        )
-        jobs.append(split_multiallelics_j)
+        # allow the contamination loop to be skipped entirely, where we know VCFs are empty
+        # VCF containing only filtered variants -> filter removes all variants -> no data for contamination est. -> fail
+        if config.config_retrieve(['workflow', 'skip_contamination'], False):
+            parse_contamination_j, contamination_level = None, None
 
-        # Estimate level of contamination from mito reads
-        get_contamination_j = mito.get_contamination(
-            vcf=split_multiallelics_j.output_vcf,
-            haplocheck_output=outputs['haplocheck_metrics'],
-            job_attrs=self.get_job_attrs(sequencing_group),
-        )
-        jobs.append(get_contamination_j)
+        else:
+            # SplitMultiAllelics AND remove non-passing sites
+            # Output is only used for input to haplocheck
+            split_multiallelics_j = mito.split_multi_allelics(
+                vcf=initial_filter_j.output_vcf,
+                remove_non_pass_sites=True,
+                job_attrs=self.get_job_attrs(sequencing_group),
+            )
+            jobs.append(split_multiallelics_j)
 
-        # Parse contamination estimate reports
-        parse_contamination_j, contamination_level = mito.parse_contamination_results(
-            haplocheck_output=get_contamination_j.haplocheck_output,
-            verifybamid_output=verifybamid_output,
-            job_attrs=self.get_job_attrs(sequencing_group),
-        )
-        jobs.append(parse_contamination_j)
+            # Estimate level of contamination from mito reads
+            get_contamination_j = mito.get_contamination(
+                vcf=split_multiallelics_j.output_vcf,
+                haplocheck_output=outputs['haplocheck_metrics'],
+                job_attrs=self.get_job_attrs(sequencing_group),
+            )
+            jobs.append(get_contamination_j)
+
+            # Parse contamination estimate reports
+            parse_contamination_j, contamination_level = mito.parse_contamination_results(
+                haplocheck_output=get_contamination_j.haplocheck_output,
+                verifybamid_output=verifybamid_output,
+                job_attrs=self.get_job_attrs(sequencing_group),
+            )
+            jobs.append(parse_contamination_j)
 
         # Filter round 2 - remove variants with VAF below estimated contamination
         second_filter_j = mito.filter_variants(
             vcf=initial_filter_j.output_vcf,
             merged_mutect_stats=merge_stats_j.combined_stats,
-            contamination_estimate=contamination_level.as_str(),
+            contamination_estimate=contamination_level,
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(second_filter_j)

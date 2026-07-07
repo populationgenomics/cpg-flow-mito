@@ -8,6 +8,9 @@ status_reporter = 'metamist'
 # Use verifybamid in addition to haplocheck for contamination estimate
 use_verifybamid = true
 
+# set to True to skip all contamination checks
+skip_contamination = false
+
 [references]
 dict = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.dict"
 fasta = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta"
