@@ -65,7 +65,12 @@ def query_for_reports(dataset: str) -> dict[str, dict[str, str]]:
             logger.warning(f'Multiple MitoReport analyses found for {sg["id"]}, last one will be used in index.')
         for report in sg['analyses']:
             meta_dict = report['meta']
-            outpath = to_path(report['outputs']['path']).blob # mito/mitoreport-CPGXXXX/index.html
+            if isinstance(report['outputs'], str):
+                outpath = to_path(report['outputs']).blob
+            elif isinstance(report['outputs'], dict):
+                outpath = to_path(report['outputs']['path']).blob # mito/mitoreport-CPGXXXX/index.html
+            else:
+                raise ValueError(f'Unexpected outputs type {type(report["outputs"])} for {sg["id"]} in {dataset}')
 
             web_bucket = config.config_retrieve(['storage', dataset, 'web_url'])
             url = f'{web_bucket}/{outpath}'
