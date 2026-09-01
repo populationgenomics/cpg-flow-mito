@@ -6,7 +6,7 @@ def download_latest_annotations(output_path: Path, job_attrs: dict[str, str]):
 
     batch_instance = hail_batch.get_batch()
     job = batch_instance.new_bash_job('Monthly annotation update', job_attrs | {'tool': 'mitoreport'})
-    job.image(config.config_retrieve(['images', 'mitoreport']))
+    job.image(config.config_retrieve(['mito_images', 'mitoreport']))
 
     # noted that this succeeds locally, but may be fragile. Perhaps a retry wrap makes sense.
     job.command(f"""

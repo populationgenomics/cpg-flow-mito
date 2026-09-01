@@ -270,7 +270,7 @@ class GenotypeMito(stage.SequencingGroupStage):
             crai=shifted_cram + '.crai',
         )
 
-        if config.config_retrieve(['workflow', 'use_verifybamid']):
+        if config.config_retrieve(['mito_settings', 'use_verifybamid']):
             verify_bamid_path = (
                 sequencing_group.dataset.prefix() / 'qc' / 'verify_bamid' / f'{sequencing_group.id}.verify-bamid.selfSM'
             )
@@ -326,7 +326,7 @@ class GenotypeMito(stage.SequencingGroupStage):
 
         # allow the contamination loop to be skipped entirely, where we know VCFs are empty
         # VCF containing only filtered variants -> filter removes all variants -> no data for contamination est. -> fail
-        if config.config_retrieve(['workflow', 'skip_contamination'], False):
+        if config.config_retrieve(['mito_settings', 'skip_contamination'], False):
             contamination_level = None
 
         else:

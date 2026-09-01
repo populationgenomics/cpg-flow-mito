@@ -1,10 +1,9 @@
-# this is a template for the config file
-# demonstrating some of the common options used in cpg-flow
 [workflow]
 
 # the method to register outputs, can be missing - will not generate metamist analysis entries
 status_reporter = 'metamist'
 
+[mito_settings]
 # Use verifybamid in addition to haplocheck for contamination estimate
 use_verifybamid = true
 
@@ -17,7 +16,20 @@ use_verifybamid = true
 # re-include them in future cohorts else we'll hit the same issue
 skip_contamination = false
 
-[references]
+# Example config for broad wdl found here:
+# https://raw.githubusercontent.com/broadinstitute/gatk/master/scripts/mitochondria_m2_wdl/ExampleInputsMitochondriaPipeline.json
+
+# f_score_beta is not configured so will use tool default of 1.0
+f_score_beta = 1.0
+
+# Sarah Stenton from Broad runs this pipline for seqr ingest and indicated they use a
+# threshold of 0.01 for seqr cohorts.
+vaf_filter_threshold = 0.01
+
+# https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
+max_alt_allele_count = 4
+
+[mito_references]
 dict = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.dict"
 fasta = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta"
 shifted_dict = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.dict"
@@ -29,19 +41,7 @@ blacklist_sites = "gs://cpg-common-main/references/hg38/v0/chrM/blacklist_sites.
 
 vep_mount = "gs://cpg-common-main/references/vep/110/mount"
 
-# Example config for broad wdl found here:
-# https://raw.githubusercontent.com/broadinstitute/gatk/master/scripts/mitochondria_m2_wdl/ExampleInputsMitochondriaPipeline.json
-
-# f_score_beta is not configured so will use tool default of 1.0
-f_score_beta = 1.0
-# Sarah Stenton from Broad runs this pipline for seqr ingest and indicated they use a
-# threshold of 0.01 for seqr cohorts.
-vaf_filter_threshold = 0.01
-
-# https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
-max_alt_allele_count = 4
-
-[images]
+[mito_images]
 bcftools = "australia-southeast1-docker.pkg.dev/cpg-common/images/bcftools:1.22-1"
 bwa = "australia-southeast1-docker.pkg.dev/cpg-common/images/bwa:0.7.17"
 gatk = "australia-southeast1-docker.pkg.dev/cpg-common/images/gatk:4.2.6.1"

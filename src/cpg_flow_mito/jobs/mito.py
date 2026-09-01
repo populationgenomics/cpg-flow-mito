@@ -36,7 +36,7 @@ def subset_cram_to_chrm(
     batch_instance = hail_batch.get_batch()
 
     j = batch_instance.new_bash_job('subset_cram_to_chrM', job_attrs | {'tool': 'gatk_PrintReads'})
-    j.image(config.config_retrieve(['images', 'gatk']))
+    j.image(config.config_retrieve(['mito_images', 'gatk']))
     j.cpu(2)
 
     reference = hail_batch.fasta_res_group(batch_instance)
@@ -95,7 +95,7 @@ def mito_realign(
 
     mito_ref = get_mito_references(shifted=shifted)
 
-    j.image(config.config_retrieve(['images', 'bwa']))
+    j.image(config.config_retrieve(['mito_images', 'bwa']))
 
     nthreads = resources.STANDARD.set_resources(j=j, ncpu=4).get_nthreads()
 
@@ -145,7 +145,7 @@ def collect_coverage_metrics(
     batch_instance = hail_batch.get_batch()
     j = batch_instance.new_bash_job('collect_coverage_metrics', job_attrs | {'tool': 'picard_CollectWgsMetrics'})
 
-    j.image(config.config_retrieve(['images', 'picard']))
+    j.image(config.config_retrieve(['mito_images', 'picard']))
     j.cpu(2)
 
     j.command(f"""
@@ -190,7 +190,7 @@ def extract_coverage_mean(
     """
     batch_instance = hail_batch.get_batch()
     j = batch_instance.new_bash_job('extract_coverage_mean', job_attrs | {'tool': 'R'})
-    j.image(config.config_retrieve(['images', 'peer']))
+    j.image(config.config_retrieve(['mito_images', 'peer']))
     j.cpu(2)
 
     # the CODE input termination must be at the start of the String, so this is fully de-dented
@@ -245,7 +245,7 @@ def coverage_at_every_base(
     reference = get_mito_references(shifted)
 
     j = batch_instance.new_bash_job('coverage_at_every_base', job_attrs | {'tool': 'picard_CollectHsMetrics'})
-    j.image(config.config_retrieve(['images', 'picard']))
+    j.image(config.config_retrieve(['mito_images', 'picard']))
     j.cpu(2)
 
     j.command(f"""
@@ -282,7 +282,7 @@ def merge_coverage(
     """
     batch_instance = hail_batch.get_batch()
     j = batch_instance.new_bash_job('merge_coverage', job_attrs | {'tool': 'R'})
-    j.image(config.config_retrieve(['images', 'peer']))
+    j.image(config.config_retrieve(['mito_images', 'peer']))
     j.cpu(2)
 
     j.command(
@@ -343,7 +343,7 @@ def mito_mutect2(
     batch_instance = hail_batch.get_batch()
 
     j = batch_instance.new_bash_job('mito_mutect2', job_attrs | {'tool': 'Mutect2'})
-    j.image(config.config_retrieve(['images', 'gatk']))
+    j.image(config.config_retrieve(['mito_images', 'gatk']))
     res = resources.STANDARD.set_resources(j=j, ncpu=4)
     res.set_to_job(j)
 
@@ -391,11 +391,11 @@ def liftover_and_combine_vcfs(
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL360-L415C2
     """
-    shift_back_chain = hail_batch.get_batch().read_input(config.config_retrieve(['references', 'shift_back_chain']))
+    shift_chain = hail_batch.get_batch().read_input(config.config_retrieve(['mito_references', 'shift_back_chain']))
     reference = get_mito_references()
     batch_instance = hail_batch.get_batch()
     j = batch_instance.new_bash_job('liftover_and_combine_vcfs', job_attrs | {'tool': 'liftover_and_combine_vcfs'})
-    j.image(config.config_retrieve(['images', 'picard']))
+    j.image(config.config_retrieve(['mito_images', 'picard']))
     j.cpu(4)
 
     j.declare_resource_group(lifted_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
@@ -406,7 +406,7 @@ def liftover_and_combine_vcfs(
             -I {shifted_vcf['vcf.gz']} \
             -O {j.lifted_vcf['vcf.gz']} \
             -R {reference.base} \
-            -CHAIN {shift_back_chain} \
+            -CHAIN {shift_chain} \
             -REJECT {j.rejected_vcf}.vcf.gz
 
         picard MergeVcfs \
@@ -439,7 +439,7 @@ def merge_mutect_stats(
     """
     batch_instance = hail_batch.get_batch()
     j = batch_instance.new_bash_job('merge_stats', job_attrs | {'tool': 'gatk_MergeMutectStats'})
-    j.image(config.config_retrieve(['images', 'gatk']))
+    j.image(config.config_retrieve(['mito_images', 'gatk']))
     j.cpu(4)
 
     j.command(
@@ -490,18 +490,18 @@ def filter_variants(
     """
     # alt_allele config from
     # https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
-    max_alt_allele_count = config.config_retrieve(['references', 'max_alt_allele_count'])
+    max_alt_allele_count = config.config_retrieve(['mito_settings', 'max_alt_allele_count'])
     if min_allele_fraction is None:
-        min_allele_fraction = config.config_retrieve(['references', 'vaf_filter_threshold'])
-    f_score_beta = config.config_retrieve(['references', 'f_score_beta'])
+        min_allele_fraction = config.config_retrieve(['mito_settings', 'vaf_filter_threshold'])
+    f_score_beta = config.config_retrieve(['mito_settings', 'f_score_beta'])
     reference = get_mito_references()
     batch_instance = hail_batch.get_batch()
     j = batch_instance.new_bash_job('filter_variants', job_attrs | {'tool': 'gatk_FilterMutectCalls'})
 
-    j.image(config.config_retrieve(['images', 'gatk']))
+    j.image(config.config_retrieve(['mito_images', 'gatk']))
     j.cpu(4)
 
-    blacklist_sites = config.config_retrieve(['references', 'blacklist_sites'])
+    blacklist_sites = config.config_retrieve(['mito_references', 'blacklist_sites'])
     blacklisted_sites = batch_instance.read_input_group(
         bed=blacklist_sites,
         idx=blacklist_sites + '.idx',
@@ -558,7 +558,7 @@ def split_multi_allelics(
     reference = get_mito_references()
     batch_instance = hail_batch.get_batch()
     j = batch_instance.new_bash_job('split_multi_allelics', job_attrs | {'tool': 'gatk_SelectVariants'})
-    j.image(config.config_retrieve(['images', 'gatk']))
+    j.image(config.config_retrieve(['mito_images', 'gatk']))
     j.cpu(4)
 
     j.declare_resource_group(split_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
@@ -614,7 +614,7 @@ def get_contamination(
     """
     batch_instance = hail_batch.get_batch()
     j = batch_instance.new_bash_job('get_contamination', job_attrs | {'tool': 'haplocheckcli'})
-    j.image(config.config_retrieve(['images', 'haplocheckcli']))
+    j.image(config.config_retrieve(['mito_images', 'haplocheckcli']))
     j.cpu(2)
 
     j.command(
@@ -725,7 +725,7 @@ def mitoreport(
     mito_ref = get_mito_references()
     batch_instance = hail_batch.get_batch()
     j = batch_instance.new_bash_job('mitoreport', job_attrs | {'tool': 'mitoreport'})
-    j.image(config.config_retrieve(['images', 'mitoreport']))
+    j.image(config.config_retrieve(['mito_images', 'mitoreport']))
 
     res = resources.STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)

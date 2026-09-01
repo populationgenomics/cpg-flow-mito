@@ -26,9 +26,9 @@ def get_mito_references(shifted: bool = False) -> 'ResourceGroup':
         dict: mito config entries
     """
     shifted_str = 'shifted_' if shifted else ''
-    mito_fa = config.config_retrieve(['references', f'{shifted_str}fasta'])
+    mito_fa = config.config_retrieve(['mito_references', f'{shifted_str}fasta'])
     return hail_batch.get_batch().read_input_group(
-        dict=config.config_retrieve(['references', f'{shifted_str}dict']),
+        dict=config.config_retrieve(['mito_references', f'{shifted_str}dict']),
         base=mito_fa,
         amb=mito_fa + '.amb',
         ann=mito_fa + '.ann',
@@ -44,6 +44,6 @@ def get_control_region_intervals() -> 'ResourceGroup':
     """Get mito control region intervals."""
 
     return hail_batch.get_batch().read_input_group(
-        control_region_shifted=config.config_retrieve(['references', 'shifted_control_region_interval']),
-        non_control_region=config.config_retrieve(['references', 'non_control_region_interval']),
+        control_region_shifted=config.config_retrieve(['mito_references', 'shifted_control_region_interval']),
+        non_control_region=config.config_retrieve(['mito_references', 'non_control_region_interval']),
     )

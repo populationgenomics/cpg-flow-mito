@@ -20,10 +20,10 @@ def vep_one(
     local_vcf = hail_batch.get_batch().read_input(vcf)
 
     # check that the cache and image for this version exist
-    vep_mount_path = to_path(config.config_retrieve(['references', 'vep_mount']))
+    vep_mount_path = to_path(config.config_retrieve(['mito_references', 'vep_mount']))
 
     job = hail_batch.get_batch().new_bash_job('AnnotateFragmentedVcfWithVep', job_attrs | {'tool': 'VEP'})
-    job.image(config.config_retrieve(['images', 'vep']))
+    job.image(config.config_retrieve(['mito_images', 'vep']))
 
     job.memory('16Gi').storage('15Gi').cpu(1)
 
