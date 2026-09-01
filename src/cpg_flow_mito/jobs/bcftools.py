@@ -30,7 +30,7 @@ def naive_merge_vcfs(
     batch_vcfs = [batch_instance.read_input(each_vcf) for each_vcf in input_list]
 
     merge_job = batch_instance.new_job('Merge VCFs', attributes=job_attrs or {} | {'tool': 'bcftools'})
-    merge_job.image(config.config_retrieve(['images', 'bcftools']))
+    merge_job.image(config.config_retrieve(['mito_images', 'bcftools']))
 
     # guessing resource requirements
     merge_job.memory(memory)
