@@ -3,30 +3,7 @@
 # the method to register outputs, can be missing - will not generate metamist analysis entries
 status_reporter = 'metamist'
 
-[mito_references]
-dict = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.dict"
-fasta = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta"
-shifted_dict = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.dict"
-shifted_fasta = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta"
-shift_back_chain = "gs://cpg-common-main/references/hg38/v0/chrM/ShiftBack.chain"
-shifted_control_region_interval = "gs://cpg-common-main/references/hg38/v0/chrM/control_region_shifted.chrM.interval_list"
-non_control_region_interval = "gs://cpg-common-main/references/hg38/v0/chrM/non_control_region.chrM.interval_list"
-blacklist_sites = "gs://cpg-common-main/references/hg38/v0/chrM/blacklist_sites.hg38.chrM.bed"
-
-vep_mount = "gs://cpg-common-main/references/vep/110/mount"
-
-[mito_images]
-bcftools = "australia-southeast1-docker.pkg.dev/cpg-common/images/bcftools:1.22-1"
-bwa = "australia-southeast1-docker.pkg.dev/cpg-common/images/bwa:0.7.17"
-gatk = "australia-southeast1-docker.pkg.dev/cpg-common/images/gatk:4.2.6.1"
-haplocheckcli = "australia-southeast1-docker.pkg.dev/cpg-common/images/haplocheckcli:64293b3481d52025a01a293f6cc891546c30660e"
-mitoreport = "australia-southeast1-docker.pkg.dev/cpg-common/images/mitoreport:1.1.0"
-peer = "australia-southeast1-docker.pkg.dev/cpg-common/images/peer:1.3"
-picard = "australia-southeast1-docker.pkg.dev/cpg-common/images/picard:2.27.4"
-vep = "australia-southeast1-docker.pkg.dev/cpg-common/images/vep_110:release_110.1"
-
 [mito_settings]
-
 # Use verifybamid in addition to haplocheck for contamination estimate
 use_verifybamid = true
 
@@ -51,3 +28,25 @@ vaf_filter_threshold = 0.01
 
 # https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
 max_alt_allele_count = 4
+
+[mito_references]
+dict = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.dict"
+fasta = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta"
+shifted_dict = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.dict"
+shifted_fasta = "gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta"
+shift_back_chain = "gs://cpg-common-main/references/hg38/v0/chrM/ShiftBack.chain"
+shifted_control_region_interval = "gs://cpg-common-main/references/hg38/v0/chrM/control_region_shifted.chrM.interval_list"
+non_control_region_interval = "gs://cpg-common-main/references/hg38/v0/chrM/non_control_region.chrM.interval_list"
+blacklist_sites = "gs://cpg-common-main/references/hg38/v0/chrM/blacklist_sites.hg38.chrM.bed"
+
+vep_mount = "gs://cpg-common-main/references/vep/110/mount"
+
+[mito_images]
+bcftools = "australia-southeast1-docker.pkg.dev/cpg-common/images/bcftools:1.22-1"
+bwa = "australia-southeast1-docker.pkg.dev/cpg-common/images/bwa:0.7.17"
+gatk = "australia-southeast1-docker.pkg.dev/cpg-common/images/gatk:4.2.6.1"
+haplocheckcli = "australia-southeast1-docker.pkg.dev/cpg-common/images/haplocheckcli:64293b3481d52025a01a293f6cc891546c30660e"
+mitoreport = "australia-southeast1-docker.pkg.dev/cpg-common/images/mitoreport:1.1.0"
+peer = "australia-southeast1-docker.pkg.dev/cpg-common/images/peer:1.3"
+picard = "australia-southeast1-docker.pkg.dev/cpg-common/images/picard:2.27.4"
+vep = "australia-southeast1-docker.pkg.dev/cpg-common/images/vep_110:release_110.1"
