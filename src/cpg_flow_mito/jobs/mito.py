@@ -100,10 +100,14 @@ def mito_realign(
 
     nthreads = resources.STANDARD.set_resources(j=j, ncpu=4).get_nthreads()
 
+    # Strip /1 /2 QNAME suffixes that prevent read pairing in downstream tools
+    # cant touch anything other than QNAME fields tho
+    awk_strip_qname = r"""awk 'BEGIN{FS=OFS="\t"} !/^@/{sub(/\/[12]$/,"",$1)} {print}'"""
+
     j.command(
         f"""\
         samtools view -h {input_bam.bam} | \
-        sed 's/\\/[12]\\t/\\t/' | \
+        {awk_strip_qname} | \
         samtools collate -u -O - /tmp/collate_tmp | \
         samtools fastq -n -@ {min(nthreads, 6)} - | \
         bwa \
