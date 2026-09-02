@@ -75,8 +75,9 @@ def mito_realign(
     """
     Re-align reads to mitochondrial genome
 
-    Uses bazam to extract fastq from input bam then pipes this directly to bwa for
-    mapping.
+    Extracts interleaved fastq from input bam using samtools, then pipes to bwa for
+    mapping. The sed step strips /1 /2 QNAME suffixes that some demuxers leave in read
+    names, which would otherwise prevent samtools from pairing mates.
 
     Args:
         sequencing_group_id: CPG sequencing_group id for inclusion in RG header
@@ -101,8 +102,10 @@ def mito_realign(
 
     j.command(
         f"""\
-        bazam -Xmx16g \
-            -n{min(nthreads, 6)} -bam {input_bam.bam} | \
+        samtools view -h {input_bam.bam} | \
+        sed 's/\\/[12]\\t/\\t/' | \
+        samtools collate -u -O - /tmp/collate_tmp | \
+        samtools fastq -n -@ {min(nthreads, 6)} - | \
         bwa \
             mem -K 100000000 -p -v 3 -t 2 -Y {mito_ref.base} \
             -R '@RG\\tID:{sequencing_group_id}\\tSM:{sequencing_group_id}' \
