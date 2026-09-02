@@ -35,3 +35,24 @@ Recommendation
 - in the event of recurrent failure at the parse_contamination_results step, run with the skip_contamination flag
 
 All samples with results already will be unaffected, and remaining samples will be run without contamination metrics.
+
+Example invocation:
+
+```bash
+analysis-runner \
+    --skip-repo-checkout \
+    --image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg-flow-mito:0.2.4-1\
+    --config your laptop path/cpg-flow-mito/src/cpg_flow_mito/config_template.toml\
+    --dataset seqr \
+    --description 'mitoindex' \
+    --access-level full \
+    --output-dir mitoindex\
+  python3 src/cpg_flow_mito/run_workflow.py
+```
+The config file should be modifed to have these at minimum:
+
+```toml
+[workflow]
+input_cohorts = ["<cohort_id>"]
+sequencing_type = "<exome|genome>"
+```
