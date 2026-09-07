@@ -18,7 +18,8 @@ def download_latest_annotations(output_path: Path, job_attrs: dict[str, str]):
        sleep 20
     done
     if [ ! -s {job.output} ]; then
-        echo "MitoMap download failed after 5 attempts. Set mito_references.mito_map_annotations in config to use a static reference." >&2
+        echo "MitoMap download failed after 5 attempts." >&2
+        echo "Set mito_references.mito_map_annotations in config to use a static reference." >&2
         exit 1
     fi
     """)
