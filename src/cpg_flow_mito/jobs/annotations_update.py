@@ -2,13 +2,11 @@ from cpg_utils import Path, config, hail_batch
 
 
 def download_latest_annotations(output_path: Path, job_attrs: dict[str, str]):
-    """Download MitoMap annotations, fall back to config reference if blocked."""
+    """Download MitoMap annotations. Only called when no config default exists."""
 
     batch_instance = hail_batch.get_batch()
     job = batch_instance.new_bash_job('Monthly annotation update', job_attrs | {'tool': 'mitoreport'})
     job.image(config.config_retrieve(['mito_images', 'mitoreport']))
-
-    fallback = batch_instance.read_input(config.config_retrieve(['mito_references', 'mito_map_annotations']))
 
     job.command(f"""
     set +e
@@ -20,8 +18,8 @@ def download_latest_annotations(output_path: Path, job_attrs: dict[str, str]):
        sleep 20
     done
     if [ ! -s {job.output} ]; then
-        echo "MitoMap download failed, using fallback annotations from config"
-        cp {fallback} {job.output}
+        echo "MitoMap download failed after 5 attempts. Set mito_references.mito_map_annotations in config to use a static reference." >&2
+        exit 1
     fi
     """)
 
