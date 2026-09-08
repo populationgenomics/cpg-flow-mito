@@ -55,11 +55,11 @@ TITLE_TO_PROPERTY_NAMES: dict[str, str] = {
     'Codon Position': 'codonPosition',
     'Amino Acid Change': 'aminoAcidChange',
     "GB Freq<span class='mark'>&Dagger;</span>": 'gbFreqStr',
-    "GB Freq<br><span style='white-space:nowrap;'>FL&nbsp;(CR)<span class='mark'>&ast;&Dagger;</span></span>": 'gbFreqStr',
+    "GB Freq<br><span style='white-space:nowrap;'>FL&nbsp;(CR)<span class='mark'>&ast;&Dagger;</span></span>": 'gbFreqStr',  # noqa: E501
     "GB&nbsp;Freq&nbsp;&nbsp;<br><span style='white-space:nowrap;'>FL&nbsp;(CR)<span class='mark'>&ast;&Dagger;</span></span>": 'gbFreqStr',  # noqa: E501
     'GB Seqs': 'gbSeqsAnchor',
-    "GB Seqs<br><span style='white-space:nowrap;'>total&nbsp;(FL/CR)<span class='mark'>&ast;</span></span>": 'gbSeqsAnchor',
-    "GB&nbsp;Seqs&nbsp;<br><span style='white-space:nowrap;'>FL&nbsp;(CR)<span class='mark'>&ast;</span></span>": 'gbSeqsAnchor',
+    "GB Seqs<br><span style='white-space:nowrap;'>total&nbsp;(FL/CR)<span class='mark'>&ast;</span></span>": 'gbSeqsAnchor',  # noqa: E501
+    "GB&nbsp;Seqs&nbsp;<br><span style='white-space:nowrap;'>FL&nbsp;(CR)<span class='mark'>&ast;</span></span>": 'gbSeqsAnchor',  # noqa: E501
     'Curated References': 'curatedRefsAnchor',
     'References': 'curatedRefsAnchor',
     'Disease': 'disease',
@@ -212,7 +212,7 @@ class MitoMapAnnotation:
                 return Decimal(0)
             return to_decimal(control_match.group(1).replace('%', '')) or Decimal(0)
 
-        logger.warning(f'Unexpected regionType when parsing gbFreqPct, regionType={self.regionType}, gbFreqStr={gb_freq_str}')
+        logger.warning(f'Unexpected regionType in gbFreqPct, regionType={self.regionType}, gbFreqStr={gb_freq_str}')
         return Decimal(0)
 
     @property
@@ -339,14 +339,14 @@ def parse_variants_html_page(html_text: str, region_type: str, mito_map_host: st
     columns = json.loads(columns_match.group(1).replace("\\'", "'"))
 
     property_names = [TITLE_TO_PROPERTY_NAMES.get((column.get('title') or '').strip()) for column in columns]
-    unmapped = [column.get('title') for column, name in zip(columns, property_names) if name is None]
+    unmapped = [column.get('title') for column, name in zip(columns, property_names) if name is None]  # noqa: B905
     if unmapped:
         logger.debug(f'{region_type}: ignoring unmapped columns {unmapped}')
 
     annotations = []
     for row in data:
         attributes: dict[str, Any] = {}
-        for property_name, value in zip(property_names, row):
+        for property_name, value in zip(property_names, row):  # noqa: B905
             if property_name is None:
                 continue
             attributes[property_name] = str(value).strip() if value is not None else None
@@ -460,7 +460,7 @@ def build_annotations(mito_map_host: str) -> list[MitoMapAnnotation]:
 def json_default(value: Any) -> Any:
     """JSON encoder hook: Decimals are written as plain numbers."""
     if isinstance(value, Decimal):
-        return int(value) if value == value.to_integral_value() and value.as_tuple().exponent >= 0 else float(value)
+        return int(value) if value == value.to_integral_value() and value.as_tuple().exponent >= 0 else float(value)  # type: ignore  # noqa: PGH003
     raise TypeError(f'Object of type {type(value).__name__} is not JSON serializable')
 
 
