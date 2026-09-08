@@ -38,6 +38,7 @@ shift_back_chain = "gs://cpg-common-main/references/hg38/v0/chrM/ShiftBack.chain
 shifted_control_region_interval = "gs://cpg-common-main/references/hg38/v0/chrM/control_region_shifted.chrM.interval_list"
 non_control_region_interval = "gs://cpg-common-main/references/hg38/v0/chrM/non_control_region.chrM.interval_list"
 blacklist_sites = "gs://cpg-common-main/references/hg38/v0/chrM/blacklist_sites.hg38.chrM.bed"
+mito_map_annotations = "gs://cpg-common-main/mitoreport_ref/2026-08/mito_map_annotations.json"
 
 vep_mount = "gs://cpg-common-main/references/vep/110/mount"
 

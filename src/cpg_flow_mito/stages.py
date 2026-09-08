@@ -31,6 +31,9 @@ class DownloadMitoMapData(stage.MultiCohortStage):
     """A once-monthly download of the data required in Mitomap."""
 
     def expected_outputs(self, _multicohort: MultiCohort) -> dict[str, Path]:
+        configured = config.config_retrieve(['mito_references', 'mito_map_annotations'], None)
+        if configured:
+            return {'annotations': to_path(configured)}
         return {'annotations': get_path_to_mito_ref_data()}
 
     def queue_jobs(
@@ -39,6 +42,10 @@ class DownloadMitoMapData(stage.MultiCohortStage):
         _inputs: StageInput,
     ) -> StageOutput:
         output = self.expected_outputs(multicohort)
+
+        if config.config_retrieve(['mito_references', 'mito_map_annotations'], None):
+            return self.make_outputs(multicohort, output, jobs=[])
+
         job = annotations_update.download_latest_annotations(
             output['annotations'],
             job_attrs=self.get_job_attrs(multicohort),
