@@ -41,7 +41,7 @@ Example invocation:
 ```bash
 analysis-runner \
     --skip-repo-checkout \
-    --image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg-flow-mito:0.2.4-1\
+    --image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg-flow-mito:0.3.0-1\
     --config your laptop path/cpg-flow-mito/src/cpg_flow_mito/config_template.toml\
     --dataset seqr \
     --description 'mitoindex' \
