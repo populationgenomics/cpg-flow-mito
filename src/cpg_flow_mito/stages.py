@@ -387,8 +387,46 @@ class GenotypeMito(stage.SequencingGroupStage):
         return self.make_outputs(sequencing_group, data=outputs, jobs=jobs)
 
 
+@stage.stage(required_stages=[DownloadMitoMapData])
+class RemapAnnotations(stage.MultiCohortStage):
+    """Remap microprotein loci to canonical genes in MitoMap annotations.
+
+    Only runs when DownloadMitoMapData produced a fresh download. When config provides
+    a static mito_map_annotations reference, it is assumed to be already remapped.
+    """
+
+    def expected_outputs(self, _multicohort: MultiCohort) -> dict[str, Path]:
+        configured = config.config_retrieve(['mito_references', 'mito_map_annotations'], None)
+        if configured:
+            return {'annotations': to_path(configured)}
+
+        download_path = get_path_to_mito_ref_data()
+        remapped_path = download_path.parent / 'mito_map_annotations.remapped.json'
+        return {'annotations': remapped_path}
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        output = self.expected_outputs(multicohort)
+
+        if config.config_retrieve(['mito_references', 'mito_map_annotations'], None):
+            return self.make_outputs(multicohort, output, jobs=[])
+
+        batch = hail_batch.get_batch()
+        annotations_input = inputs.as_path(multicohort, DownloadMitoMapData, 'annotations')
+        annotations_local = batch.read_input(str(annotations_input))
+        reference_fasta = config.config_retrieve(['mito_references', 'fasta'])
+        reference_local = batch.read_input(reference_fasta)
+
+        job = annotations_update.remap_microproteins(
+            annotations_input=annotations_local,
+            reference_input=reference_local,
+            output_path=output['annotations'],
+            job_attrs=self.get_job_attrs(multicohort),
+        )
+        return self.make_outputs(multicohort, output, jobs=job)
+
+
 @stage.stage(
-    required_stages=[DownloadMitoMapData, RealignMito, GenotypeMito],
+    required_stages=[RemapAnnotations, RealignMito, GenotypeMito],
     analysis_type='web',
     analysis_keys=['mitoreport'],
 )
@@ -420,7 +458,7 @@ class MitoReport(stage.SequencingGroupStage):
         outputs = self.expected_outputs(sequencing_group)
 
         multicohort = workflow.get_multicohort()
-        mitomap_annotations = inputs.as_path(multicohort, DownloadMitoMapData, 'annotations')
+        mitomap_annotations = inputs.as_path(multicohort, RemapAnnotations, 'annotations')
 
         jobs = []
 
