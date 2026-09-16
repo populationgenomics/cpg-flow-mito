@@ -56,3 +56,28 @@ The config file should be modifed to have these at minimum:
 input_cohorts = ["<cohort_id>"]
 sequencing_type = "<exome|genome>"
 ```
+
+## MitoMap microprotein annotation remapping
+
+MitoMap has begun annotating variants under recently proposed microprotein and alternative ORF gene names
+(e.g. MT-GAU, MT-SHMOOSE, MT-CYTB-187AA) that overlap with established canonical mitochondrial genes.
+This causes variants in well-characterised coding regions (such as MT-CO1, MT-CYB, MT-ND4) to lose their
+codon context and appear as non-coding in downstream reports.
+
+The script `remap_microprotein_annotations.py` remaps these annotations back to the canonical gene, but
+only when the variant position falls within the canonical gene's rCRS (NC_012920.1) coordinates.
+
+### Remapping rules
+
+| Microprotein | Canonical gene | Source |
+|---|---|---|
+| MT-GAU | MT-CO1 | Faure et al. 2011, Biology Direct 6:56 |
+| MT-CYTB-187AA | MT-CYB | |
+| MT-ALTND4 | MT-ND4 | |
+| MT-SHMOOSE | MT-TS2 / MT-TL2 / MT-ND5 | Position-dependent (spans 3 genes) |
+| MT-HN, MT-Hum | MT-RNR2 | Humanin |
+| MT-MOTSc | MT-RNR1 | |
+| MT-SHLP1–6 | MT-RNR2 | |
+| MT-TER | MT-TL1 | |
+| MT-RNR3 | MT-RNR2 | |
+| MT-OLR | MT-TC | Only positions within MT-TC (5761–5826); non-coding OL positions are left unchanged |
