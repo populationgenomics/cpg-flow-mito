@@ -26,3 +26,19 @@ def download_latest_annotations(output_path: Path, job_attrs: dict[str, str]):
 
     batch_instance.write_output(job.output, str(output_path))
     return job
+
+
+def remap_microproteins(annotations_input, reference_input, output_path: Path, job_attrs: dict[str, str]):
+    """Remap microprotein loci to canonical genes in the downloaded MitoMap annotations."""
+
+    batch_instance = hail_batch.get_batch()
+    job = batch_instance.new_bash_job('Remap microprotein annotations', job_attrs)
+    job.image(config.config_retrieve(['workflow', 'driver_image']))
+
+    job.command(
+        f'python -m cpg_flow_mito.scripts.remap_microproteins '
+        f'-i {annotations_input} -r {reference_input} -o {job.output}',
+    )
+
+    batch_instance.write_output(job.output, str(output_path))
+    return job
