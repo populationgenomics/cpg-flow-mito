@@ -503,7 +503,27 @@ class CreateIndexPage(stage.DatasetStage):
         index_name = 'exome_index.html' if seq_type == 'exome' else 'genome_index.html'
         return {'html': web_bucket / index_name}
 
-    def queue_jobs(self, dataset: targets.Dataset, _inputs: stage.StageInput) -> stage.StageOutput:
+    def queue_jobs(self, dataset: targets.Dataset, inputs: stage.StageInput) -> stage.StageOutput:
         output = self.expected_outputs(dataset)
-        job = build_index.create_index_job(dataset=dataset.name, output=output['html'])
+
+        report_outputs = inputs.as_dict_by_target(MitoReport)
+        web_url = config.config_retrieve(['storage', dataset.name, 'web_url']).rstrip('/')
+
+        reports: dict[str, dict[str, str]] = {}
+        for sg in dataset.get_sequencing_groups():
+            if sg.id not in report_outputs:
+                continue
+            mitoreport_path = str(report_outputs[sg.id]['mitoreport'])
+            blob = to_path(mitoreport_path).blob
+            reports[sg.id] = {
+                'participant': sg.participant_id,
+                'url': f'{web_url}/{blob}',
+                'path': mitoreport_path,
+            }
+
+        job = build_index.create_index_job(
+            dataset=dataset.name,
+            output=output['html'],
+            reports=reports,
+        )
         return self.make_outputs(dataset, data=output, jobs=job)
