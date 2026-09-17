@@ -56,4 +56,3 @@ The config file should be modifed to have these at minimum:
 input_cohorts = ["<cohort_id>"]
 sequencing_type = "<exome|genome>"
 ```
-
