@@ -513,17 +513,16 @@ class CreateIndexPage(stage.DatasetStage):
         for sg in dataset.get_sequencing_groups():
             if sg.id not in report_outputs:
                 continue
-            mitoreport_path = str(report_outputs[sg.id]['mitoreport'])
-            blob = to_path(mitoreport_path).blob
             reports[sg.id] = {
                 'participant': sg.participant_id,
-                'url': f'{web_url}/{blob}',
-                'path': mitoreport_path,
+                'url': f'{web_url}/mito/mitoreport-{sg.id}/index.html',
+                'path': str(report_outputs[sg.id]['mitoreport']),
             }
 
         job = build_index.create_index_job(
             dataset=dataset.name,
             output=output['html'],
             reports=reports,
+            tmp_prefix=self.tmp_prefix,
         )
         return self.make_outputs(dataset, data=output, jobs=job)
