@@ -64,20 +64,14 @@ MitoMap has begun annotating variants under recently proposed microprotein and a
 This causes variants in well-characterised coding regions (such as MT-CO1, MT-CYB, MT-ND4) to lose their
 codon context and appear as non-coding in downstream reports.
 
-The script `remap_microprotein_annotations.py` remaps these annotations back to the canonical gene, but
-only when the variant position falls within the canonical gene's rCRS (NC_012920.1) coordinates.
+The `RemapAnnotations` stage replaces these with consequences on the parent gene, using `bcftools csq` rather than
+re-implementing consequence prediction. The mapping of microprotein to parent gene is set in config, as
+`mito_references.microprotein_parents`. Microproteins spanning several genes can list multiple parents, e.g.
+`"MT-SHMOOSE" = ["MT-ND5", "MT-TS2", "MT-TL2"]`; where an allele has consequences on more than one, the first listed
+is used. The script `scripts/reannotate_microproteins.py` runs in three steps:
 
-### Remapping rules
-
-| Microprotein | Canonical gene | Source |
-|---|---|---|
-| MT-GAU | MT-CO1 | Faure et al. 2011, Biology Direct 6:56 |
-| MT-CYTB-187AA | MT-CYB | |
-| MT-ALTND4 | MT-ND4 | |
-| MT-SHMOOSE | MT-TS2 / MT-TL2 / MT-ND5 | Position-dependent (spans 3 genes) |
-| MT-HN, MT-Hum | MT-RNR2 | Humanin |
-| MT-MOTSc | MT-RNR1 | |
-| MT-SHLP1–6 | MT-RNR2 | |
-| MT-TER | MT-TL1 | |
-| MT-RNR3 | MT-RNR2 | |
-| MT-OLR | MT-TC | Only positions within MT-TC (5761–5826); non-coding OL positions are left unchanged |
+1. `to-vcf`: every allele annotated on a microprotein in the mapping is written to a sites-only VCF
+2. `bcftools csq` annotates that VCF against `mito_references.gff3`, using the mitochondrial codon table (`-C 2`)
+3. `apply`: wherever csq reports a consequence on the parent gene, the `locus`, `locusAnchor`, `aminoAcidChange`,
+   `codonNumber`, and `codonPosition` fields are replaced. Annotations without a consequence on any of their parent
+   genes are left unchanged

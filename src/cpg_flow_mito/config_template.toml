@@ -40,10 +40,30 @@ non_control_region_interval = "gs://cpg-common-main/references/hg38/v0/chrM/non_
 blacklist_sites = "gs://cpg-common-main/references/hg38/v0/chrM/blacklist_sites.hg38.chrM.bed"
 mito_map_annotations = "gs://cpg-common-main/mitoreport_ref/2026-08/mito_map_annotations.json"
 
+# Ensembl GFF3 with MT renamed to M, used by bcftools csq to re-annotate microprotein variants in MitoMap data
+gff3 = "gs://cpg-common-main/references/ensembl_116/GRCh38_chrM_renamed.gff3.gz"
+
 vep_mount = "gs://cpg-common-main/references/vep/110/mount"
 
+# MitoMap variants annotated on these microproteins are re-annotated against the parent gene
+# a list of parents can be given for microproteins spanning several genes, the first with a consequence is used
+[mito_references.microprotein_parents]
+"MT-MOTSc" = "MT-RNR1"
+"MT-SHLP1" = "MT-RNR2"
+"MT-SHLP2" = "MT-RNR2"
+"MT-SHLP3" = "MT-RNR2"
+"MT-SHLP4" = "MT-RNR2"
+"MT-SHLP5" = "MT-RNR2"
+"MT-SHLP6" = "MT-RNR2"
+"MT-HN" = "MT-RNR2"
+"MT-Hum" = "MT-RNR2"
+"MT-GAU" = "MT-CO1"
+"MT-ALTND4" = "MT-ND4"
+"MT-SHMOOSE" = ["MT-ND5", "MT-TS2", "MT-TL2"]
+"MT-CYTB-187AA" = "MT-CYB"
+
 [mito_images]
-bcftools = "australia-southeast1-docker.pkg.dev/cpg-common/images/bcftools:1.22-1"
+bcftools = "australia-southeast1-docker.pkg.dev/cpg-common/images/bcftools:1.24-1"
 bwa = "australia-southeast1-docker.pkg.dev/cpg-common/images/bwa:0.7.17"
 gatk = "australia-southeast1-docker.pkg.dev/cpg-common/images/gatk:4.2.6.1"
 haplocheckcli = "australia-southeast1-docker.pkg.dev/cpg-common/images/haplocheckcli:64293b3481d52025a01a293f6cc891546c30660e"

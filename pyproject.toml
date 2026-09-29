@@ -85,6 +85,9 @@ ignore = [
     "PLR2004", # Magic value used in comparison, consider replacing with a constant
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"test/*" = ["S101"] # assert is the pytest idiom
+
 [tool.ruff.lint.isort]
 section-order = ["future", "standard-library", "third-party", "hail", "cpg", "first-party", "local-folder"]
 
