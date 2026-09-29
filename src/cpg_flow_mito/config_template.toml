@@ -48,19 +48,22 @@ vep_mount = "gs://cpg-common-main/references/vep/110/mount"
 # MitoMap variants annotated on these microproteins are re-annotated against the parent gene
 # a list of parents can be given for microproteins spanning several genes, the first with a consequence is used
 [mito_references.microprotein_parents]
+"MT-ALTND4" = "MT-ND4"
+"MT-CYTB-187AA" = "MT-CYB"
+"MT-GAU" = "MT-CO1"
+"MT-HN" = "MT-RNR2"
+"MT-Hum" = "MT-RNR2"
 "MT-MOTSc" = "MT-RNR1"
+"MT-OLR" = "MT-TC"
+"MT-RNR3" = "MT-RNR2"
 "MT-SHLP1" = "MT-RNR2"
 "MT-SHLP2" = "MT-RNR2"
 "MT-SHLP3" = "MT-RNR2"
 "MT-SHLP4" = "MT-RNR2"
 "MT-SHLP5" = "MT-RNR2"
 "MT-SHLP6" = "MT-RNR2"
-"MT-HN" = "MT-RNR2"
-"MT-Hum" = "MT-RNR2"
-"MT-GAU" = "MT-CO1"
-"MT-ALTND4" = "MT-ND4"
 "MT-SHMOOSE" = ["MT-ND5", "MT-TS2", "MT-TL2"]
-"MT-CYTB-187AA" = "MT-CYB"
+"MT-TER" = "MT-TL1"
 
 [mito_images]
 bcftools = "australia-southeast1-docker.pkg.dev/cpg-common/images/bcftools:1.24-1"
