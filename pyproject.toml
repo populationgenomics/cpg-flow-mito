@@ -7,7 +7,7 @@ name='cpg_flow_mito'
 description='Mitochondrial analysis implemented in CPG-Flow'
 readme = "README.md"
 requires-python = ">=3.10,<3.12"
-version="0.3.0"
+version="0.3.1"
 license={ "file" = "LICENSE" }
 classifiers=[
     'Environment :: Console',
@@ -85,6 +85,9 @@ ignore = [
     "PLR2004", # Magic value used in comparison, consider replacing with a constant
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"test/*" = ["S101"] # assert is the pytest idiom
+
 [tool.ruff.lint.isort]
 section-order = ["future", "standard-library", "third-party", "hail", "cpg", "first-party", "local-folder"]
 
@@ -93,7 +96,7 @@ cpg = ["cpg_flow_mito", "cpg-flow", "cpg-utils"]
 hail = ["hail"]
 
 [tool.bumpversion]
-current_version = "0.3.0"
+current_version = "0.3.1"
 parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
 serialize = ["{major}.{minor}.{patch}"]
 commit = true
