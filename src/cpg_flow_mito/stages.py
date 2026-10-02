@@ -19,11 +19,11 @@ from cpg_flow_mito.jobs import annotations_update, bcftools, build_index, mito, 
 
 @cache
 def get_path_to_mito_ref_data():
-    """Build a path to the expected MitoMap annotations."""
+    """Build a path to the expected MitoMap annotation folder."""
     tz = zoneinfo.ZoneInfo('Australia/Brisbane')
     this_month_as_string = datetime.now(tz=tz).strftime('%Y-%m')
     common_default = config.config_retrieve(['storage', 'common', 'default'])
-    return to_path(common_default) / 'mitoreport_ref' / this_month_as_string / 'mito_map_annotations.json'
+    return to_path(common_default) / 'mitoreport_ref' / this_month_as_string
 
 
 @stage.stage
@@ -31,11 +31,10 @@ class DownloadMitoMapData(stage.MultiCohortStage):
     """A once-monthly download of the data required in Mitomap."""
 
     def expected_outputs(self, _multicohort: MultiCohort) -> dict[str, Path]:
-        configured = config.config_retrieve(['mito_references', 'mito_map_annotations'], None)
-        if configured:
+        if configured := config.config_retrieve(['mito_references', 'mito_map_annotations'], None):
             return {'annotations': to_path(configured)}
 
-        return {'annotations': get_path_to_mito_ref_data()}
+        return {'annotations': get_path_to_mito_ref_data()  / 'mito_map_annotations.json'}
 
     def queue_jobs(
         self,
@@ -397,19 +396,10 @@ class RemapAnnotations(stage.MultiCohortStage):
     """
 
     def expected_outputs(self, _multicohort: MultiCohort) -> dict[str, Path]:
-        configured = config.config_retrieve(['mito_references', 'mito_map_annotations'], None)
-        if configured:
-            return {'annotations': to_path(configured)}
-
-        download_path = get_path_to_mito_ref_data()
-        remapped_path = download_path.parent / 'mito_map_annotations.remapped.json'
-        return {'annotations': remapped_path}
+        return {'annotations': get_path_to_mito_ref_data() / 'mito_map_annotations.remapped.json'}
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         output = self.expected_outputs(multicohort)
-
-        if config.config_retrieve(['mito_references', 'mito_map_annotations'], None):
-            return self.make_outputs(multicohort, output, jobs=[])
 
         jobs = annotations_update.reannotate_microproteins(
             annotations_input=inputs.as_path(multicohort, DownloadMitoMapData, 'annotations'),
