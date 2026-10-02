@@ -34,6 +34,7 @@ class DownloadMitoMapData(stage.MultiCohortStage):
         configured = config.config_retrieve(['mito_references', 'mito_map_annotations'], None)
         if configured:
             return {'annotations': to_path(configured)}
+
         return {'annotations': get_path_to_mito_ref_data()}
 
     def queue_jobs(

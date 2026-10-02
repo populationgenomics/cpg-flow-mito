@@ -2,27 +2,18 @@ from cpg_utils import Path, config, hail_batch
 
 
 def download_latest_annotations(output_path: Path, job_attrs: dict[str, str]):
-    """Download MitoMap annotations. Only called when no config default exists."""
+    """
+    Download MitoMap annotations. Only called when no config default exists.
+
+    Since 09-2026 this is using a custom re-implementation, as the default MitoMap server refuses connections, and
+    MitoReport's download class can't switch to a new data host URL.
+    """
 
     batch_instance = hail_batch.get_batch()
-    job = batch_instance.new_bash_job('Monthly annotation update', job_attrs | {'tool': 'mitoreport'})
-    job.image(config.config_retrieve(['mito_images', 'mitoreport']))
+    job = batch_instance.new_bash_job('Monthly annotation update', job_attrs)
+    job.image(config.config_retrieve(['workflow', 'driver_image']))
 
-    job.command(f"""
-    set +e
-    n=0
-    until [ "$n" -ge 5 ]
-    do
-       java -jar mitoreport.jar mito-map-download --output {job.output} && break
-       n=$((n+1))
-       sleep 20
-    done
-    if [ ! -s {job.output} ]; then
-        echo "MitoMap download failed after 5 attempts." >&2
-        echo "Set mito_references.mito_map_annotations in config to use a static reference." >&2
-        exit 1
-    fi
-    """)
-
+    mitomap = config.config_retrieve(['mito_references', 'mitomap_server'])
+    job.command(f'python -m cpg_flow_mito.scripts.generate_annotation_data -o {job.output} --mito-map-host {mitomap}')
     batch_instance.write_output(job.output, str(output_path))
     return job
