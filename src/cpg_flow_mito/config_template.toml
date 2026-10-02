@@ -38,6 +38,11 @@ shift_back_chain = "gs://cpg-common-main/references/hg38/v0/chrM/ShiftBack.chain
 shifted_control_region_interval = "gs://cpg-common-main/references/hg38/v0/chrM/control_region_shifted.chrM.interval_list"
 non_control_region_interval = "gs://cpg-common-main/references/hg38/v0/chrM/non_control_region.chrM.interval_list"
 blacklist_sites = "gs://cpg-common-main/references/hg38/v0/chrM/blacklist_sites.hg38.chrM.bed"
+
+# alternate server to avoid cloudflare issues on MitoMap's main server
+mitomap_server = "https://fr.mitomap.org"
+
+# un-comment/set this parameter to circumvent the fresh annotation download
 mito_map_annotations = ""
 
 # Ensembl GFF3 with MT renamed to M, used by bcftools csq to re-annotate microprotein variants in MitoMap data
