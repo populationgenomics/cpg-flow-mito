@@ -10,9 +10,11 @@ from datetime import datetime
 from functools import cache
 
 from cpg_flow import stage, targets, workflow
+from cpg_flow.metamist import GET_ANALYSES_QUERY, get_metamist
 from cpg_flow.stage import StageInput, StageOutput
 from cpg_flow.targets import MultiCohort
 from cpg_utils import Path, config, hail_batch, to_path
+from metamist.graphql import query as metamist_query
 
 from cpg_flow_mito.jobs import annotations_update, bcftools, build_index, mito, picard, vep
 
@@ -526,9 +528,6 @@ class CreateIndexPage(stage.DatasetStage):
         return {'html': web_bucket / index_name}
 
     def queue_jobs(self, dataset: targets.Dataset, inputs: stage.StageInput) -> stage.StageOutput:
-        from cpg_flow.metamist import GET_ANALYSES_QUERY, get_metamist
-        from metamist.graphql import query as metamist_query
-
         output = self.expected_outputs(dataset)
         web_url = config.config_retrieve(['storage', dataset.name, 'web_url']).rstrip('/')
         metamist_proj = get_metamist().get_metamist_proj(dataset.name)
