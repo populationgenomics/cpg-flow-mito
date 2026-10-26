@@ -527,7 +527,7 @@ class CreateIndexPage(stage.DatasetStage):
         index_name = 'exome_index.html' if seq_type == 'exome' else 'genome_index.html'
         return {'html': web_bucket / index_name}
 
-    def queue_jobs(self, dataset: targets.Dataset, inputs: stage.StageInput) -> stage.StageOutput:
+    def queue_jobs(self, dataset: targets.Dataset, _inputs: stage.StageInput) -> stage.StageOutput:
         output = self.expected_outputs(dataset)
         web_url = config.config_retrieve(['storage', dataset.name, 'web_url']).rstrip('/')
         metamist_proj = get_metamist().get_metamist_proj(dataset.name)
