@@ -526,19 +526,38 @@ class CreateIndexPage(stage.DatasetStage):
         return {'html': web_bucket / index_name}
 
     def queue_jobs(self, dataset: targets.Dataset, inputs: stage.StageInput) -> stage.StageOutput:
+        from cpg_flow.metamist import GET_ANALYSES_QUERY, get_metamist
+        from metamist.graphql import query as metamist_query
+
         output = self.expected_outputs(dataset)
+        web_url = config.config_retrieve(['storage', dataset.name, 'web_url']).rstrip('/')
+        metamist_proj = get_metamist().get_metamist_proj(dataset.name)
 
-        all_report_outputs = inputs.as_dict_by_target(MitoReport)
+        analyses = metamist_query(GET_ANALYSES_QUERY, variables={
+            'metamist_proj': metamist_proj,
+            'analysis_type': 'web',
+            'analysis_status': 'COMPLETED',
+        })
 
-        dataset_report_outputs = {
-            sg_id: sg_outputs for sg_id, sg_outputs in all_report_outputs.items()
-            if sg_id in dataset.get_sequencing_group_ids()
-        }
+        reports: dict[str, dict[str, str]] = {}
+        for analysis in analyses.get('project', {}).get('analyses', []):
+            meta = analysis.get('meta', {})
+            if meta.get('stage') != 'MitoReport':
+                continue
+            sg_ids = [sg['id'] for sg in analysis.get('sequencingGroups', [])]
+            if len(sg_ids) != 1:
+                continue
+            sg_id = sg_ids[0]
+            reports[sg_id] = {
+                'participant': meta.get('participant_id', sg_id),
+                'url': f'{web_url}/mito/mitoreport-{sg_id}/index.html',
+                'path': analysis.get('output', ''),
+            }
 
         job = build_index.create_index_job(
             dataset=dataset.name,
             output=output['html'],
-            report_outputs=dataset_report_outputs,
+            reports=reports,
             tmp_prefix=self.tmp_prefix,
         )
         return self.make_outputs(dataset, data=output, jobs=job)
