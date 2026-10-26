@@ -528,17 +528,21 @@ class CreateIndexPage(stage.DatasetStage):
     def queue_jobs(self, dataset: targets.Dataset, inputs: stage.StageInput) -> stage.StageOutput:
         output = self.expected_outputs(dataset)
 
-        report_outputs = inputs.as_dict_by_target(MitoReport)
+        all_report_outputs = inputs.as_dict_by_target(MitoReport)
         web_url = config.config_retrieve(['storage', dataset.name, 'web_url']).rstrip('/')
 
+        dataset_report_outputs = {
+            sg_id: outputs for sg_id, outputs in all_report_outputs.items()
+            if sg_id in dataset.get_sequencing_group_ids()
+        }
+
         reports: dict[str, dict[str, str]] = {}
-        for sg in dataset.get_sequencing_groups():
-            if sg.id not in report_outputs:
-                continue
-            reports[sg.id] = {
+        for sg_id, sg_outputs in dataset_report_outputs.items():
+            sg = dataset.get_sequencing_group_by_id(sg_id)
+            reports[sg_id] = {
                 'participant': sg.participant_id,
-                'url': f'{web_url}/mito/mitoreport-{sg.id}/index.html',
-                'path': str(report_outputs[sg.id]['mitoreport']),
+                'url': f'{web_url}/mito/mitoreport-{sg_id}/index.html',
+                'path': str(sg_outputs['mitoreport']),
             }
 
         job = build_index.create_index_job(
