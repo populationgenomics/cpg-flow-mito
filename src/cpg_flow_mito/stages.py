@@ -528,8 +528,9 @@ class CreateIndexPage(stage.DatasetStage):
         return {'html': web_bucket / index_name}
 
     def queue_jobs(self, dataset: targets.Dataset, _inputs: stage.StageInput) -> stage.StageOutput:
-        output = self.expected_outputs(dataset)
-        web_url = config.config_retrieve(['storage', dataset.name, 'web_url']).rstrip('/')
+        outputs = self.expected_outputs(dataset)
+        web_prefix = config.config_retrieve(['storage', dataset.name, 'web'])
+        web_url = config.config_retrieve(['storage', dataset.name, 'web_url'])
         metamist_proj = get_metamist().get_metamist_proj(dataset.name)
 
         analyses = metamist_query(GET_ANALYSES_QUERY, variables={
@@ -541,22 +542,20 @@ class CreateIndexPage(stage.DatasetStage):
         reports: dict[str, dict[str, str]] = {}
         for analysis in analyses.get('project', {}).get('analyses', []):
             meta = analysis.get('meta', {})
-            if meta.get('stage') != 'MitoReport':
+            if meta.get('stage') != 'MitoReport' or 'participant_id' not in meta:
                 continue
-            sg_ids = [sg['id'] for sg in analysis.get('sequencingGroups', [])]
-            if len(sg_ids) != 1:
-                continue
-            sg_id = sg_ids[0]
+            sg_id = analysis['sequencingGroups'][0]['id']
+            output_path = analysis['output']
             reports[sg_id] = {
-                'participant': meta.get('participant_id', sg_id),
-                'url': f'{web_url}/mito/mitoreport-{sg_id}/index.html',
-                'path': analysis.get('output', ''),
+                'participant': meta['participant_id'],
+                'url': output_path.replace(web_prefix, web_url),
+                'path': output_path,
             }
 
         job = build_index.create_index_job(
             dataset=dataset.name,
-            output=output['html'],
+            output=outputs['html'],
             reports=reports,
             tmp_prefix=self.tmp_prefix,
         )
-        return self.make_outputs(dataset, data=output, jobs=job)
+        return self.make_outputs(dataset, data=outputs, jobs=job)
