@@ -10,9 +10,11 @@ from datetime import datetime
 from functools import cache
 
 from cpg_flow import stage, targets, workflow
+from cpg_flow.metamist import GET_ANALYSES_QUERY, get_metamist
 from cpg_flow.stage import StageInput, StageOutput
 from cpg_flow.targets import MultiCohort
 from cpg_utils import Path, config, hail_batch, to_path
+from metamist.graphql import query as metamist_query
 
 from cpg_flow_mito.jobs import annotations_update, bcftools, build_index, mito, picard, vep
 
@@ -525,26 +527,35 @@ class CreateIndexPage(stage.DatasetStage):
         index_name = 'exome_index.html' if seq_type == 'exome' else 'genome_index.html'
         return {'html': web_bucket / index_name}
 
-    def queue_jobs(self, dataset: targets.Dataset, inputs: stage.StageInput) -> stage.StageOutput:
-        output = self.expected_outputs(dataset)
+    def queue_jobs(self, dataset: targets.Dataset, _inputs: stage.StageInput) -> stage.StageOutput:
+        outputs = self.expected_outputs(dataset)
+        web_prefix = config.config_retrieve(['storage', dataset.name, 'web'])
+        web_url = config.config_retrieve(['storage', dataset.name, 'web_url'])
+        metamist_proj = get_metamist().get_metamist_proj(dataset.name)
 
-        report_outputs = inputs.as_dict_by_target(MitoReport)
-        web_url = config.config_retrieve(['storage', dataset.name, 'web_url']).rstrip('/')
+        analyses = metamist_query(GET_ANALYSES_QUERY, variables={
+            'metamist_proj': metamist_proj,
+            'analysis_type': 'web',
+            'analysis_status': 'COMPLETED',
+        })
 
         reports: dict[str, dict[str, str]] = {}
-        for sg in dataset.get_sequencing_groups():
-            if sg.id not in report_outputs:
+        for analysis in analyses.get('project', {}).get('analyses', []):
+            meta = analysis.get('meta', {})
+            if meta.get('stage') != 'MitoReport' or 'participant_id' not in meta:
                 continue
-            reports[sg.id] = {
-                'participant': sg.participant_id,
-                'url': f'{web_url}/mito/mitoreport-{sg.id}/index.html',
-                'path': str(report_outputs[sg.id]['mitoreport']),
+            sg_id = analysis['sequencingGroups'][0]['id']
+            output_path = analysis['output']
+            reports[sg_id] = {
+                'participant': meta['participant_id'],
+                'url': output_path.replace(web_prefix, web_url),
+                'path': output_path,
             }
 
         job = build_index.create_index_job(
             dataset=dataset.name,
-            output=output['html'],
+            output=outputs['html'],
             reports=reports,
             tmp_prefix=self.tmp_prefix,
         )
-        return self.make_outputs(dataset, data=output, jobs=job)
+        return self.make_outputs(dataset, data=outputs, jobs=job)
