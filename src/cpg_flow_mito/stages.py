@@ -10,13 +10,14 @@ from datetime import datetime
 from functools import cache
 
 from cpg_flow import stage, targets, workflow
-from cpg_flow.metamist import GET_ANALYSES_QUERY, get_metamist
+from cpg_flow.metamist import get_metamist
 from cpg_flow.stage import StageInput, StageOutput
 from cpg_flow.targets import MultiCohort
 from cpg_utils import Path, config, hail_batch, to_path
 from metamist.graphql import query as metamist_query
 
 from cpg_flow_mito.jobs import annotations_update, bcftools, build_index, mito, picard, vep
+from cpg_flow_mito.utils import SG_ANALYSES_QUERY
 
 
 @cache
@@ -533,24 +534,21 @@ class CreateIndexPage(stage.DatasetStage):
         web_url = config.config_retrieve(['storage', dataset.name, 'web_url'])
         metamist_proj = get_metamist().get_metamist_proj(dataset.name)
 
-        analyses = metamist_query(GET_ANALYSES_QUERY, variables={
-            'metamist_proj': metamist_proj,
-            'analysis_type': 'web',
-            'analysis_status': 'COMPLETED',
-        })
+        result = metamist_query(SG_ANALYSES_QUERY, variables={'project': metamist_proj})
 
         reports: dict[str, dict[str, str]] = {}
-        for analysis in analyses.get('project', {}).get('analyses', []):
-            meta = analysis.get('meta', {})
-            if meta.get('stage') != 'MitoReport' or 'participant_id' not in meta:
-                continue
-            sg_id = analysis['sequencingGroups'][0]['id']
-            output_path = analysis['output']
-            reports[sg_id] = {
-                'participant': meta['participant_id'],
-                'url': output_path.replace(web_prefix, web_url),
-                'path': output_path,
-            }
+        for sg in result.get('project', {}).get('sequencingGroups', []):
+            sg_id = sg['id']
+            participant = sg['sample']['participant']['externalId']
+            for analysis in sg.get('analyses', []):
+                if analysis.get('meta', {}).get('stage') != 'MitoReport':
+                    continue
+                output_path = analysis['outputs']['path']
+                reports[sg_id] = {
+                    'participant': participant,
+                    'url': output_path.replace(web_prefix, web_url),
+                    'path': output_path,
+                }
 
         job = build_index.create_index_job(
             dataset=dataset.name,

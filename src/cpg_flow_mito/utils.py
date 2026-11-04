@@ -7,6 +7,26 @@ from functools import cache
 from typing import TYPE_CHECKING
 
 from cpg_utils import config, hail_batch
+from metamist.graphql import gql
+
+SG_ANALYSES_QUERY = gql("""
+    query SgAnalyses($project: String!) {
+        project(name: $project) {
+            sequencingGroups {
+                id
+                sample {
+                    participant {
+                        externalId
+                    }
+                }
+                analyses(active: {eq: true}, type: {eq: "web"}, status: {eq: COMPLETED}) {
+                    meta
+                    outputs
+                }
+            }
+        }
+    }
+""")
 
 if TYPE_CHECKING:
     from hailtop.batch import ResourceGroup
